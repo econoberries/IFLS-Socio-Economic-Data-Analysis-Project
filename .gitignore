@@ -1,0 +1,39 @@
+# Local R / RStudio session files
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+.Renviron
+.DS_Store
+Thumbs.db
+
+# Data stay local, including CSV copies and metadata.
+01_data/**
+!01_data/**/
+!01_data/**/README.md
+!01_data/**/.gitkeep
+
+# Downloaded documentation stays local; instructions and source register are tracked.
+00_documentation/**
+!00_documentation/**/
+!00_documentation/**/README.md
+!00_documentation/**/.gitkeep
+!00_documentation/source_register.csv
+
+# Generated outputs and rendered notebooks stay local.
+05_outputs/**
+!05_outputs/**/
+!05_outputs/**/README.md
+!05_outputs/**/.gitkeep
+03_notebooks/*.html
+03_notebooks/*_files/
+03_notebooks/*_cache/
+
+# Additional protection against accidentally adding source data / archives elsewhere.
+*.[dD][tT][aA]
+*.zip
+*.7z
+*.tar
+*.gz
+*.rds
+*.RDS

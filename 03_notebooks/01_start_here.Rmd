@@ -1,0 +1,65 @@
+---
+title: "IFLS — Project Setup and Source Data Inventory"
+author: "Khaira Abdillah"
+output:
+  html_document:
+    toc: true
+    code_folding: show
+---
+
+This notebook checks the project folders and lists the available source files.
+It does not clean, filter, merge, or convert datasets when knitted.
+
+```{r setup, include=FALSE}
+# Knit from the project root rather than the notebook directory.
+project_root <- if (file.exists("IFLS_Project.Rproj")) "." else ".."
+knitr::opts_knit$set(root.dir = normalizePath(project_root, winslash = "/"))
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+```
+
+## 1. Prepare folders
+
+Open `IFLS_Project.Rproj` first. Run the package installation script from the
+Console once before knitting this notebook.
+
+```{r folders}
+source("02_scripts/00_setup_folders.R", local = TRUE)
+```
+
+## 2. Inspect the available Stata files
+
+```{r inventory}
+source_files <- sort(list.files(
+  raw_dta_folder, pattern = "\\.dta$", ignore.case = TRUE,
+  recursive = TRUE, full.names = TRUE
+))
+
+source_inventory <- data.frame(
+  source_file = substring(source_files, nchar(raw_dta_folder) + 2L),
+  size_mb = round(file.info(source_files)$size / 1024^2, 2)
+)
+
+knitr::kable(source_inventory, caption = "Original Stata files available locally")
+```
+
+## 3. Create the CSV copies explicitly
+
+Run this command in the Console when your datasets are in place. This chunk is
+disabled during knitting because a full conversion can take time.
+
+```{r convert, eval=FALSE}
+source("02_scripts/02_convert_all_dta_to_csv.R")
+```
+
+## 4. Load a dataset for later exploration
+
+Use the `.dta` version in R when you want the original variable and value labels.
+CSV copies are useful for exchanging data with other software. Read identifier
+columns as character to avoid losing leading zeros. Here is an IFLS5 example;
+change the relative filename if your extracted files are nested more deeply.
+
+```{r load-example, eval=FALSE}
+roster <- haven::read_dta(
+  file.path(raw_dta_folder, "ifls5", "household", "bk_ar1.dta")
+)
+```
