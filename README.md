@@ -134,22 +134,54 @@ this step does not decide which codes should be treated as missing in an analysi
 For work in R, reading the original `.dta` with `haven::read_dta()` is often the
 most convenient way to retain labels.
 
-## Repeating a conversion
+## Selecting surveys and repeating a conversion
 
-By default, `overwrite_csv <- FALSE` in `config.R`:
+Choose the surveys at the top of `02_scripts/02_convert_all_dta_to_csv.R`.
+This setting is used whether you run the script directly or through the master Rmd.
 
-- A complete existing export with a matching source checksum is skipped.
-- An incomplete export or a changed source is reported as a failure.
-- New source files are converted normally.
+To check every survey currently in the raw-data folder:
 
-To deliberately recreate exports, set `overwrite_csv <- TRUE`, run the conversion,
-then set it back to `FALSE`. Existing CSV contents are not checksummed; use this
-option to repair an export that you have edited. Treat `02_raw_csv` as read-only.
-The script does not remove orphaned exports if you rename or remove a source file.
+```r
+surveys_to_convert <- "all"
+```
 
-Each run writes a status inventory and R session information in `05_outputs/logs/`.
-Read the inventory's `message` column if the script reports failures. One failed
-file does not prevent the remaining source files from being attempted.
+After completing IFLS4 and IFLS5, you can add earlier waves and select only those:
+
+```r
+surveys_to_convert <- c("ifls1", "ifls2", "ifls3")
+```
+
+With that selection, IFLS4 and IFLS5 are excluded from processing. To process just
+one survey, use `surveys_to_convert <- "ifls3"`. If a selected survey has no source
+files yet, the script reports that; other selected surveys with data can still run.
+
+Before processing, the script displays the selected surveys, counts by survey and
+component, and overwrite mode. Every progress line shows the relative source path,
+including its survey folder. The progress counter counts files checked, not files
+newly converted. The result of each check is explicitly labelled:
+
+| Result | Meaning |
+| --- | --- |
+| `CONVERTED` | CSV and companion metadata were written |
+| `SKIPPED` | A complete export exists and the source checksum matches; outputs were not rewritten |
+| `FAILED` | An error occurred; read the printed explanation or saved inventory |
+
+Keep `overwrite_csv <- FALSE` in `config.R` for routine work. With that setting,
+selecting `"all"` checks existing exports but does not recreate complete exports
+whose source checksums match. A new source file is converted. An incomplete export
+or changed source is reported as a failure rather than silently overwritten.
+
+To deliberately recreate exports, select the intended surveys, set
+`overwrite_csv <- TRUE`, run the conversion, then set it back to `FALSE`.
+Existing CSV contents are not checksummed; this option can repair an export you
+have edited. Treat `02_raw_csv` as read-only. The script does not remove orphaned
+exports when a source is renamed or removed.
+
+Each run prints converted, skipped, and failed counts by survey and saves a status
+inventory and R session information in `05_outputs/logs/`. The inventory includes
+survey and component columns. One failed file does not prevent the remaining
+selected source files from being attempted. Run only one conversion process at a
+time, including conversions started from the terminal, RStudio, or the master Rmd.
 
 ## Optional notebook and converter check
 

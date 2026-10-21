@@ -256,6 +256,15 @@ if (run_converter_check) {
 Change `convert_dta_to_csv <- TRUE` in the first settings chunk when ready,
 then knit this document again or rerun the chunks in order.
 
+Choose the surveys at the top of `02_scripts/02_convert_all_dta_to_csv.R`.
+Its default, `surveys_to_convert <- "all"`, checks all available surveys and
+skips complete, unchanged exports while `overwrite_csv <- FALSE` in `config.R`.
+After finishing IFLS4 and IFLS5, use
+`surveys_to_convert <- c("ifls1", "ifls2", "ifls3")` to process only the earlier
+waves. With that selection, IFLS4 and IFLS5 are excluded from processing.
+Progress lines distinguish `CONVERTED`, `SKIPPED`, and `FAILED` files and show
+the relative source path. Run one conversion process at a time.
+
 The conversion mirrors the original subfolders. For your IFLS4 example:
 
 | Output | Relative path |
