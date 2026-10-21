@@ -1,0 +1,165 @@
+# IFLS Socio-Economic Data Analysis Project
+
+Owner: Khaira Abdillah
+
+A fresh, reproducible R workspace for organizing IFLS source data and documentation,
+creating CSV copies, and building education and socioeconomic analyses.
+
+## Start here
+
+1. Clone this repository to your computer. In GitHub Desktop, choose **File → Clone
+   Repository → URL**, paste the repository URL, and select a local folder such as
+   `/Users/khaira_abdillah/Documents/Data Analysis/IFLS-Socio-Economic-Data-Analysis-Project`.
+2. Open **IFLS_Project.Rproj** in RStudio. Keep that project open while working.
+3. Run the following lines in the RStudio Console, in order:
+
+   ```r
+   source("02_scripts/00_setup_folders.R")
+   source("02_scripts/01_install_packages.R")
+   ```
+
+4. Copy the extracted original `.dta` files and downloaded documentation into the
+   folders described below. Preserve the source filenames and any nested folders.
+5. Create the CSV copies:
+
+   ```r
+   source("02_scripts/02_convert_all_dta_to_csv.R")
+   ```
+
+You can start with IFLS5 alone. Empty folders for other surveys do not prevent
+conversion. No source IFLS datasets are included in the repository.
+
+## Main folders
+
+| Folder | What belongs here | GitHub |
+| --- | --- | --- |
+| `00_documentation/` | Downloaded questionnaires, codebooks, user guides, literature, and a source register | Instructions and source register only |
+| `01_data/` | Original Stata files, CSV copies, metadata, and later derived datasets | Folder placeholders and instructions only |
+| `02_scripts/` | Reusable R scripts for setup, conversion, and later data construction | Tracked |
+| `03_notebooks/` | R Markdown explanations, source inventories, and exploration | Source `.Rmd` files tracked |
+| `04_notes/` | Research questions, variable decisions, and meeting notes | Tracked |
+| `05_outputs/` | Generated tables, figures, and run logs | Instructions and placeholders only |
+| `06_paper/` | Seminar paper source and references | Tracked |
+| `config.R` | Project paths and conversion settings | Tracked |
+
+Downloaded documents and data stay on your computer even though the repository is
+private. `.gitignore` prevents these files from being added by ordinary Git commands.
+Keep a separate backup of your local data and documents; GitHub does not back them up.
+
+## Where to put the original datasets
+
+Separate each survey, then household and community data:
+
+| Survey folder | Original household files | Original community files |
+| --- | --- | --- |
+| `ifls1` | `01_data/01_raw_dta/ifls1/household/` | `01_data/01_raw_dta/ifls1/community/` |
+| `ifls2` | `01_data/01_raw_dta/ifls2/household/` | `01_data/01_raw_dta/ifls2/community/` |
+| `ifls3` | `01_data/01_raw_dta/ifls3/household/` | `01_data/01_raw_dta/ifls3/community/` |
+| `ifls4` | `01_data/01_raw_dta/ifls4/household/` | `01_data/01_raw_dta/ifls4/community/` |
+| `ifls5` | `01_data/01_raw_dta/ifls5/household/` | `01_data/01_raw_dta/ifls5/community/` |
+
+The setup script also creates separate `ifls2plus` and `ifls_east` folders. Keep
+these surveys separate; folder organization does not establish panel comparability.
+
+For example, put `bk_ar1.dta` in
+`01_data/01_raw_dta/ifls5/household/bk_ar1.dta`.
+If you keep an extracted `hh14_all_dta` subfolder instead, that is fine: the
+converter searches recursively and reproduces that extra subfolder in its output.
+
+Do not clean or overwrite files in `01_raw_dta`. Build derived datasets in the
+intermediate and analysis folders. Do not combine files from different waves into
+one source folder, since many have the same names.
+
+## Where to put questionnaires and other documentation
+
+For each survey, use these folders. Replace `ifls5` with the relevant survey:
+
+| Document | Location |
+| --- | --- |
+| Household and community questionnaires | `00_documentation/ifls5/questionnaires/` |
+| Codebooks, variable lists, and data dictionaries | `00_documentation/ifls5/codebooks/` |
+| User guides, fieldwork reports, sampling and weighting notes | `00_documentation/ifls5/user_guides/` |
+| Documentation covering multiple surveys | `00_documentation/general/` |
+| Research articles | `00_documentation/literature/` |
+
+Preserve the original downloaded filenames. If useful, add `household` and
+`community` subfolders under `questionnaires`. Record download URLs and dates in
+`00_documentation/source_register.csv`.
+
+## What the conversion creates
+
+| Data stage | Purpose | Example |
+| --- | --- | --- |
+| `01_raw_dta` | Untouched, authoritative Stata source | `ifls5/household/bk_ar1.dta` |
+| `02_raw_csv` | Uncleaned CSV copy of each source dataset | `ifls5/household/bk_ar1.csv` |
+| `03_metadata` | Companion labels, types, missing tags, and source information | `ifls5/household/bk_ar1__variables.csv` |
+| `04_intermediate` | Later reshaping, harmonization, and merge steps | Nothing created yet |
+| `05_analysis` | Later final analysis samples | Nothing created yet |
+
+For every dataset, the converter writes one UTF-8 CSV plus four metadata files:
+
+- `__variables.csv`: variable order, variable labels, R classes, storage types,
+  and Stata display formats available through haven.
+- `__value_labels.csv`: response codes and their labels, including labelled
+  missing codes when present.
+- `__tagged_missing.csv`: the variable, original one-based row number, and tag
+  for each `.a`, `.b`, etc. missing value. A header-only file means no tags occurred.
+- `__file_info.csv`: relative source path, MD5 checksum, dimensions, dataset label,
+  conversion time, and package versions.
+
+The main CSV preserves variable names, column order, row order, numeric response
+codes, and string values. Nothing is filtered, merged, or substantively recoded.
+CSV is a derived exchange format, not a complete Stata replacement:
+
+- Variable/value labels and tagged missing distinctions live in the metadata files.
+- Numeric missing values are blank CSV fields. Empty Stata strings also remain blank.
+- Dates and times imported by haven use readable date/time representations;
+  CSV does not retain Stata's numeric date encoding or display format.
+- Other Stata features not exposed by haven, such as some notes and characteristics,
+  may not be exported. Always retain the `.dta` files.
+- CSV has no column types. When importing it later, explicitly set identifier columns
+  to character so leading zeros survive. Excel's automatic conversions can change IDs.
+
+Numeric special response codes such as `8`, `9`, or `900` remain numeric codes;
+this step does not decide which codes should be treated as missing in an analysis.
+For work in R, reading the original `.dta` with `haven::read_dta()` is often the
+most convenient way to retain labels.
+
+## Repeating a conversion
+
+By default, `overwrite_csv <- FALSE` in `config.R`:
+
+- A complete existing export with a matching source checksum is skipped.
+- An incomplete export or a changed source is reported as a failure.
+- New source files are converted normally.
+
+To deliberately recreate exports, set `overwrite_csv <- TRUE`, run the conversion,
+then set it back to `FALSE`. Existing CSV contents are not checksummed; use this
+option to repair an export that you have edited. Treat `02_raw_csv` as read-only.
+The script does not remove orphaned exports if you rename or remove a source file.
+
+Each run writes a status inventory and R session information in `05_outputs/logs/`.
+Read the inventory's `message` column if the script reports failures. One failed
+file does not prevent the remaining source files from being attempted.
+
+## Optional notebook and converter check
+
+After package installation, open `03_notebooks/01_start_here.Rmd` and click **Knit**
+using RStudio's default document-directory knit setting. It creates folders and
+lists source files; it does not run a full conversion.
+
+To check the converter with synthetic data on your computer:
+
+```r
+source("02_scripts/checks/check_conversion.R")
+```
+
+This check uses a temporary directory, including labelled values, tagged missings,
+dates, nested paths, leading-zero IDs, repeated runs, and changed sources. It does
+not read or modify your IFLS data.
+
+## Technical references
+
+- [haven: reading Stata files and imported labels](https://haven.tidyverse.org/reference/read_dta.html)
+- [haven: tagged missing values](https://haven.tidyverse.org/reference/tagged_na.html)
+- [readr: writing CSV files](https://readr.tidyverse.org/reference/write_delim.html)
