@@ -1,0 +1,337 @@
+---
+title: "IFLS — Master Project Setup"
+author: "Khaira Abdillah"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    code_folding: show
+---
+
+Use this document as the starting point for the project. Open
+`IFLS_Project.Rproj`, then open this file and click **Knit**. You can also run
+the chunks in order in RStudio while the project is open.
+
+This document calls the existing R scripts, prepares folders, checks packages,
+and lists the original Stata files. CSV conversion is controlled by a setting
+below. The original datasets are never cleaned, filtered, merged, or overwritten.
+
+If **Knit** is unavailable because R Markdown is not installed, run this once in
+the RStudio Console before knitting:
+
+```{r first-time-rmarkdown, eval=FALSE}
+install.packages(c("rmarkdown", "knitr"), repos = "https://cloud.r-project.org")
+```
+
+# Choose the project location and settings
+
+The path below is your current project folder. Keep this master file directly
+inside that folder, alongside `IFLS_Project.Rproj` and `config.R`.
+
+For the first run, keep `convert_dta_to_csv <- FALSE` to inspect the setup. Once
+your source files are in place, change it to `TRUE` and knit again to create CSVs.
+The converter's overwrite setting remains in `config.R` and defaults to `FALSE`.
+
+```{r settings, error=FALSE}
+# 1. Your actual local project folder
+project_folder <- paste0(
+  "/Users/khaira_abdillah/Documents/IFLS_Causal_Project/",
+  "IFLS-Socio-Economic-Data-Analysis-Project-main"
+)
+
+# 2. Which steps should run?
+install_missing_packages <- TRUE
+run_converter_check <- TRUE
+convert_dta_to_csv <- FALSE
+
+# 3. Check the project folder before continuing
+if (!dir.exists(project_folder)) {
+  stop("Project folder was not found. Edit project_folder in the settings chunk.")
+}
+
+project_folder <- normalizePath(project_folder, winslash = "/", mustWork = TRUE)
+
+if (!file.exists(file.path(project_folder, "IFLS_Project.Rproj"))) {
+  stop("IFLS_Project.Rproj was not found inside the selected project folder.")
+}
+
+# 4. Use this folder for all following chunks during knitting
+knitr::opts_knit$set(root.dir = project_folder)
+knitr::opts_chunk$set(
+  echo = TRUE,
+  cache = FALSE,
+  error = FALSE,
+  message = TRUE,
+  warning = TRUE
+)
+
+cat("Project folder:", project_folder, "\n")
+```
+
+# Check that the existing scripts are available
+
+This master document reuses the scripts already in your project. Run it from the
+project root so that their relative paths work consistently.
+
+```{r check-project-files}
+if (normalizePath(getwd(), winslash = "/", mustWork = TRUE) != project_folder) {
+  stop("Open the correct IFLS_Project.Rproj before running the chunks manually.")
+}
+
+required_files <- c(
+  "config.R",
+  "02_scripts/00_setup_folders.R",
+  "02_scripts/01_install_packages.R",
+  "02_scripts/02a_convert_one_dta.R",
+  "02_scripts/02_convert_all_dta_to_csv.R",
+  "02_scripts/checks/check_conversion.R"
+)
+
+missing_files <- required_files[
+  !file.exists(file.path(project_folder, required_files))
+]
+
+if (length(missing_files) > 0L) {
+  stop("Required project files are missing: ", paste(missing_files, collapse = ", "))
+}
+
+cat("All required project scripts were found.\n")
+```
+
+# Install and check packages
+
+With `install_missing_packages <- TRUE`, the existing installation script installs
+only packages that are missing. Installed packages are not reinstalled or upgraded.
+Package installation needs an internet connection.
+
+```{r packages}
+if (install_missing_packages) {
+  source("02_scripts/01_install_packages.R", local = TRUE)
+}
+
+packages_needed <- c("haven", "readr", "rmarkdown", "knitr")
+packages_available <- vapply(
+  packages_needed, requireNamespace, logical(1), quietly = TRUE
+)
+
+if (any(!packages_available)) {
+  stop(
+    "Required packages are missing: ",
+    paste(packages_needed[!packages_available], collapse = ", "),
+    ". Set install_missing_packages <- TRUE and run again."
+  )
+}
+
+package_table <- data.frame(
+  package = packages_needed,
+  version = vapply(
+    packages_needed,
+    function(package) as.character(utils::packageVersion(package)),
+    character(1)
+  )
+)
+
+knitr::kable(package_table, caption = "Packages available for this setup")
+```
+
+# Create the folders and load the project paths
+
+This step can be repeated. Existing files stay in place. The script also loads
+`config.R`, which defines the data and documentation paths used below.
+
+```{r prepare-folders}
+source("02_scripts/00_setup_folders.R", local = TRUE)
+
+folder_table <- data.frame(
+  purpose = c(
+    "Documentation", "Original Stata data", "CSV copies", "Metadata",
+    "Intermediate datasets", "Analysis datasets", "Run logs"
+  ),
+  folder = c(
+    documentation_folder, raw_dta_folder, raw_csv_folder, metadata_folder,
+    intermediate_folder, analysis_folder, logs_folder
+  )
+)
+
+folder_table$exists <- dir.exists(folder_table$folder)
+if (!all(folder_table$exists)) {
+  stop("Some project folders could not be created. Check folder permissions.")
+}
+
+knitr::kable(folder_table, caption = "Project folders")
+```
+
+# Put the source files in place
+
+Use these paths relative to the project folder. Keep downloaded source filenames
+and extracted subfolders such as `hh07_all_dta`.
+
+| Content | Folder |
+| --- | --- |
+| IFLS4 household Stata datasets | `01_data/01_raw_dta/ifls4/household/hh07_all_dta/` |
+| IFLS4 community Stata datasets | `01_data/01_raw_dta/ifls4/community/` |
+| IFLS5 household Stata datasets | `01_data/01_raw_dta/ifls5/household/` |
+| IFLS5 community Stata datasets | `01_data/01_raw_dta/ifls5/community/` |
+| IFLS4 questionnaires | `00_documentation/ifls4/questionnaires/` |
+| IFLS4 codebooks | `00_documentation/ifls4/codebooks/` |
+| IFLS4 user guides | `00_documentation/ifls4/user_guides/` |
+
+Use the same pattern for the other surveys. You can start with one survey;
+the other survey folders can remain empty. Extract `.zip` archives before running
+the converter, which reads `.dta` files rather than archives.
+
+Your known IFLS4 source file is checked here. Its absence does not stop setup if
+you are preparing the project before copying data.
+
+```{r check-known-source}
+example_source <- file.path(
+  raw_dta_folder, "ifls4", "household", "hh07_all_dta", "b1_cov.dta"
+)
+
+knitr::kable(data.frame(
+  file = example_source,
+  found = file.exists(example_source)
+), caption = "Check your existing IFLS4 file")
+```
+
+# Create an inventory of all original Stata files
+
+This step lists files recursively, including nested folders. It does not load
+the datasets into memory. The full inventory is saved in
+`05_outputs/logs/source_file_inventory.csv`; this report displays up to 30 files.
+
+```{r source-inventory}
+source_files <- sort(list.files(
+  raw_dta_folder,
+  pattern = "\\.dta$",
+  ignore.case = TRUE,
+  recursive = TRUE,
+  full.names = TRUE
+))
+
+relative_files <- substring(source_files, nchar(raw_dta_folder) + 2L)
+
+source_inventory <- data.frame(
+  source_file = relative_files,
+  size_mb = round(file.info(source_files)$size / 1024^2, 2),
+  stringsAsFactors = FALSE
+)
+
+readr::write_csv(
+  source_inventory,
+  file.path(logs_folder, "source_file_inventory.csv"),
+  na = ""
+)
+
+cat("Original Stata files found:", nrow(source_inventory), "\n\n")
+
+if (nrow(source_inventory) > 0L) {
+  knitr::kable(
+    head(source_inventory, 30),
+    caption = "Original source files: first 30 entries"
+  )
+} else {
+  cat("Copy your extracted .dta files into 01_data/01_raw_dta, then run again.")
+}
+```
+
+# Check the converter using synthetic data
+
+The check uses temporary example data to test labels, tagged missing values,
+leading-zero identifiers, dates, nested folders, repeated runs, and changed
+sources. It does not read or alter your IFLS files. A failed check stops this
+document before the full conversion.
+
+```{r converter-check}
+if (run_converter_check) {
+  source("02_scripts/checks/check_conversion.R", local = TRUE)
+} else {
+  cat("Synthetic converter check was skipped by your settings.\n")
+}
+```
+
+# Create the CSV copies
+
+Change `convert_dta_to_csv <- TRUE` in the first settings chunk when ready,
+then knit this document again or rerun the chunks in order.
+
+The conversion mirrors the original subfolders. For your IFLS4 example:
+
+| Output | Relative path |
+| --- | --- |
+| Original Stata file | `01_data/01_raw_dta/ifls4/household/hh07_all_dta/b1_cov.dta` |
+| Generated CSV | `01_data/02_raw_csv/ifls4/household/hh07_all_dta/b1_cov.csv` |
+| Companion metadata folder | `01_data/03_metadata/ifls4/household/hh07_all_dta/` |
+
+The CSV keeps the response codes. Companion metadata files hold variable labels,
+value labels, and tagged missing-value positions. Keep the original `.dta` files
+as the authoritative source; CSV does not retain every Stata feature.
+
+```{r convert-data}
+conversion_completed <- FALSE
+
+if (convert_dta_to_csv) {
+  if (length(source_files) == 0L) {
+    stop("Conversion was requested, but no source .dta files were found.")
+  }
+
+  source("02_scripts/02_convert_all_dta_to_csv.R", local = TRUE)
+  conversion_completed <- TRUE
+} else {
+  cat("Setup completed without running the full data conversion.\n")
+  cat("Set convert_dta_to_csv <- TRUE to create the CSV copies.\n")
+}
+```
+
+```{r conversion-results}
+if (conversion_completed) {
+  status_counts <- as.data.frame(table(conversion_inventory$status))
+  names(status_counts) <- c("status", "files")
+
+  cat("\nDetailed conversion inventory:", inventory_file, "\n")
+  knitr::kable(status_counts, caption = "Results of this conversion run")
+}
+```
+
+# Review what is ready
+
+```{r setup-summary}
+csv_files <- list.files(
+  raw_csv_folder, pattern = "\\.csv$", ignore.case = TRUE,
+  recursive = TRUE, full.names = TRUE
+)
+
+setup_summary <- data.frame(
+  item = c(
+    "Original Stata files found",
+    "CSV files currently present",
+    "Synthetic check requested",
+    "Full conversion requested",
+    "Full conversion completed in this run"
+  ),
+  value = c(
+    as.character(length(source_files)), as.character(length(csv_files)),
+    as.character(run_converter_check), as.character(convert_dta_to_csv),
+    as.character(conversion_completed)
+  )
+)
+
+knitr::kable(setup_summary, caption = "Setup summary")
+```
+
+The CSV file count includes exports from earlier runs. It is not, by itself,
+proof that every source file has a current export. When conversion runs, use its
+status inventory to check the results. Generated data, metadata, documentation
+downloads, and logs stay local under the repository's existing exclusion rules.
+
+After setup, we can explore the source datasets and construct the education
+analysis sample in separate scripts and notebooks.
+
+# Record the R environment
+
+```{r session-information}
+session_information <- capture.output(sessionInfo())
+writeLines(session_information, file.path(logs_folder, "master_setup_session.txt"))
+cat(session_information, sep = "\n")
+```

@@ -28,6 +28,9 @@ Thumbs.db
 03_notebooks/*.html
 03_notebooks/*_files/
 03_notebooks/*_cache/
+/00_master_setup.html
+/00_master_setup_files/
+/00_master_setup_cache/
 
 # Additional protection against accidentally adding source data / archives elsewhere.
 *.[dD][tT][aA]

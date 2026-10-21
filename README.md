@@ -7,27 +7,36 @@ creating CSV copies, and building education and socioeconomic analyses.
 
 ## Start here
 
-1. Clone this repository to your computer. In GitHub Desktop, choose **File → Clone
-   Repository → URL**, paste the repository URL, and select a local folder such as
-   `/Users/khaira_abdillah/Documents/Data Analysis/IFLS-Socio-Economic-Data-Analysis-Project`.
-2. Open **IFLS_Project.Rproj** in RStudio. Keep that project open while working.
-3. Run the following lines in the RStudio Console, in order:
+Your current local project folder is:
 
-   ```r
-   source("02_scripts/00_setup_folders.R")
-   source("02_scripts/01_install_packages.R")
-   ```
+```text
+/Users/khaira_abdillah/Documents/IFLS_Causal_Project/IFLS-Socio-Economic-Data-Analysis-Project-main/
+```
 
-4. Copy the extracted original `.dta` files and downloaded documentation into the
-   folders described below. Preserve the source filenames and any nested folders.
-5. Create the CSV copies:
+1. Open **IFLS_Project.Rproj** inside this folder in RStudio.
+2. Open **00_master_setup.Rmd**, which belongs directly in the project root.
+3. Click **Knit** to install missing packages, prepare folders, list source files,
+   and run the synthetic converter check. If R Markdown is not yet installed,
+   run `source("02_scripts/01_install_packages.R")` in the Console first.
+4. Inspect the file inventory and check that your source datasets are present.
+5. In the master document's settings chunk, change
+   `convert_dta_to_csv <- FALSE` to `convert_dta_to_csv <- TRUE` and knit again
+   when ready to create CSV copies.
 
-   ```r
-   source("02_scripts/02_convert_all_dta_to_csv.R")
-   ```
+The master document calls the existing R scripts in order. It uses your actual
+project path, which you can edit in its settings chunk if the folder moves.
+You can also run the chunks in order while the correct RStudio project is open.
+Full conversion is off by default, and the overwrite setting in `config.R`
+remains `FALSE`.
 
-You can start with IFLS5 alone. Empty folders for other surveys do not prevent
-conversion. No source IFLS datasets are included in the repository.
+You can start with IFLS4 alone, including your existing source file at
+`01_data/01_raw_dta/ifls4/household/hh07_all_dta/b1_cov.dta`.
+Its CSV copy will be placed at
+`01_data/02_raw_csv/ifls4/household/hh07_all_dta/b1_cov.csv`.
+Empty folders for other surveys do not prevent conversion. No source IFLS
+datasets are included in the repository.
+
+For the individual Console commands instead, see [02_scripts/README.md](02_scripts/README.md).
 
 ## Main folders
 
