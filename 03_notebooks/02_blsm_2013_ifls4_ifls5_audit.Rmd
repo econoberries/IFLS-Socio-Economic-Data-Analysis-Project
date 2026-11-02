@@ -1,0 +1,114 @@
+---
+title: "BLSM 2013 — IFLS4/IFLS5 Feasibility and Data Audit"
+author: "Khaira Abdillah"
+date: "2026-11-03"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    code_folding: show
+---
+
+# Objective
+
+Study **BLSM 2013** and changes in **real household economic welfare** between IFLS4 (2007–08) and IFLS5 (2014–15).
+
+The first estimand is the **ATT for actual recipients**, followed by ATT within *baseline-defined* subgroups. The primary outcome candidate is **real monthly household consumption per capita**. No causal estimates will be computed until treatment timing, household linkage, outcome construction and identification assumptions have been reviewed.
+
+The scripts below use original Stata data and save **aggregate diagnostics only** to:
+
+\`05_outputs/tables/blsm_2013/\`
+
+\`\`\`{r setup, include=FALSE}
+project_root <- if (file.exists("IFLS_Project.Rproj")) "." else ".."
+knitr::opts_knit$set(root.dir=normalizePath(project_root,winslash="/"))
+knitr::opts_chunk$set(echo=TRUE,message=FALSE,warning=FALSE)
+\`\`\`
+
+## Step 1 — Verify BLSM program codes, receipt and timing
+
+The IFLS5 Book 1 KSR1 questionnaire uses **KSR3TYPE column C = BLSM**, **KSR17 = receipt**, and KSR18/KSR22 as first/last dates for PKH/BLSM. It distinguishes BLT 2008 and PKH.
+
+\`\`\`{r treatment-audit, eval=FALSE}
+source("02_scripts/10_blsm_2013/01_treatment_audit.R")
+\`\`\`
+
+Read \`00_ksr1_variable_labels.csv\`, \`01_program_codes.csv\`, \`01_receipt_codes.csv\`, \`02_blsm_timing_classification.csv\`, and \`03_blsm_first_last_year.csv\`.
+
+**Decisions:** Does the data label truly identify BLSM, and how many recipients first received it in 2013? Are there late/unknown dates? Do not treat missing records as control households. Inspect payment dates relative to the IFLS5 interview, and distinguish the 2013 program from assistance starting in late 2014.
+
+## Step 2 — Inspect longitudinal linkage and household mobility
+
+\`\`\`{r panel-audit, eval=FALSE}
+source("02_scripts/10_blsm_2013/02_panel_audit.R")
+\`\`\`
+
+Review \`04_ptrack_linkage_counts.csv\`, \`05_splitoff_audit.csv\`, \`06_htrack_linkage_counts.csv\` and member/result-code frequencies. Use \`PIDLINK\` for tracking **people**; household-level analyses need an explicit policy for household splits and composition changes. Do not blindly merge \`HHID07 == HHID14\`.
+
+**Decisions:** Do we use a stable-household panel, a 2007 baseline-household lineage, or an individual-anchored welfare panel? Estimate attrition/split-off sensitivity, and avoid defining inclusion through future outcomes of treatment.
+
+## Step 3 — Audit KS consumption components for both waves
+
+\`\`\`{r consumption-audit, eval=FALSE}
+source("02_scripts/10_blsm_2013/03_welfare_inventory.R")
+\`\`\`
+
+Review \`09_welfare_file_inventory.csv\` and \`10_welfare_variable_dictionary.csv\`. In KS, weekly food, monthly nonfood, annual nonfood, education, housing, and own-produced/received food must be assigned to consistent categories and reference periods.
+
+Candidate outcome: monthly consumption per capita, at **constant prices**. Document item recoding, missing/special codes, inclusions/exclusions, treatment-related spending, CPI and spatial deflation, number of current household members, and zero/implausible values. Do not sum KS variables until the full mapping is verified. A household cash transfer is not itself a consumption item.
+
+## View audit outputs
+
+Run each script from the Console once, then knit this notebook to display any completed tables.
+
+\`\`\`{r audit-summary}
+files <- c(
+  "02_blsm_timing_classification.csv",
+  "04_ptrack_linkage_counts.csv",
+  "05_splitoff_audit.csv",
+  "09_welfare_file_inventory.csv"
+)
+folder <- "05_outputs/tables/blsm_2013"
+for (f in files) {
+  file <- file.path(folder, f)
+  cat("\n\n### ", f, "\n\n", sep="")
+  if (file.exists(file)) {
+    print(knitr::kable(utils::read.csv(file), caption=f))
+  } else {
+    cat("Not generated yet — run the corresponding script from the Console.\n")
+  }
+}
+\`\`\`
+
+## Step 4 — Pretreatment covariates and heterogeneity audit (planned)
+
+Candidate baseline \`X\`: real IFLS4 welfare and asset ownership, household size/composition, household-head education, employment, pre-existing cash assistance, urban/rural status, and region. Restrict to information known **before BLSM 2013**, and consider whether some IFLS4 reports are already affected by older BLT programs.
+
+Prespecified subgroup ATT:
+- Baseline poor versus vulnerable/nonpoor, using a documented 2007 welfare benchmark.
+- Urban versus rural (IFLS4).
+- Baseline household composition (e.g., with/without children).
+
+**Avoid:** using 2014/15 poverty to define heterogeneity; it is post-treatment.
+
+## Step 5 — Observational ATT identification (planned; no model yet)
+
+Candidate design: doubly robust **panel DiD ATT** with baseline-covariate adjustment, conditional parallel trends, overlap, consistency, and no problematic spillovers. An ATT estimate is only credible if these assumptions are defensible. With two waves we cannot directly test pre-treatment parallel trends for welfare. Plan sensitivity to the 2013 fuel-price shock, program targeting, other assistance, attrition, measurement error, and inference that respects household clustering / survey design.
+
+**No LATE without a valid instrument.** A KPS card or eligibility indicator cannot automatically be used as an IV; its assignment mechanism and exclusion restriction must be established.
+
+## Step 6 — RAPSEM feasibility (future, separately identified)
+
+RAPSEM estimates controlled direct and mediator effects, **not automatically ATT**. To apply it to observational BLSM receipt we would need:
+- A validated treatment ignorability argument or an explicitly developed alternative;
+- A *post-BLSM, pre-outcome* mediator, ideally measured with multiple valid latent indicators;
+- A defensible treatment-by-baseline-covariate mediator interaction satisfying relevance and exclusion conditions;
+- A theoretically and statistically justified adaptation of the G-estimation / factor-score correction and uncertainty quantification.
+
+The IFLS4–IFLS5 pair by itself may not support a temporally separated post-treatment mediator and outcome. Do not invent a causal mediator from simultaneous IFLS5 measurements.
+
+## References
+- [IFLS5 Household Questionnaire (RAND)](https://www.rand.org/content/dam/rand/pubs/working_papers/WR1100/WR1143z3/RAND_WR1143z3.pdf)
+- [IFLS5 Guide](https://studylib.net/doc/12699099/user-s-guide-for-the-indonesia-family-life-survey--wave-5...)
+- [2013 BLSM implementation (SMERU)](https://www.smeru.or.id/en/publication/use-social-protection-card-kps-and-implementation-2013-unconditional-cash-transfer)
+- [RAPSEM authors' implementation](https://github.com/PsychometricsMZ/RAPSEM)
