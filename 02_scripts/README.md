@@ -26,3 +26,19 @@ source("02_scripts/10_blsm_2013/04_interview_calendar_audit.R")
 ```
 
 For explanations and output tables, see `03_notebooks/02_blsm_2013_ifls4_ifls5_audit.Rmd` and the [module instructions](10_blsm_2013/README.md). This is a variable/timing/eligibility **audit only**; it does not fit an ATT estimator, create a consumption aggregate, or write IFLS observations to GitHub.
+
+
+### Python-first alternative (recommended for BLSM study)
+
+The BLSM 2013 feasibility audit can now run **entirely in Python** without sourcing any R files. Open the project root, set up a Python virtual environment, then follow the [Python audit README](10_blsm_2013/python/README.md).
+
+Run:
+
+```bash
+python 02_scripts/10_blsm_2013/python/01_treatment_audit.py
+python 02_scripts/10_blsm_2013/python/02_panel_audit.py
+python 02_scripts/10_blsm_2013/python/03_welfare_inventory.py
+python 02_scripts/10_blsm_2013/python/04_interview_calendar_audit.py
+```
+
+A matching Jupyter notebook is available at [`03_notebooks/02_blsm_2013_ifls4_ifls5_audit_py.ipynb`](../03_notebooks/02_blsm_2013_ifls4_ifls5_audit_py.ipynb). No conversion to CSV is necessary: `pyreadstat` reads the original Stata files with value-label metadata. The earlier R scripts remain as optional references.
