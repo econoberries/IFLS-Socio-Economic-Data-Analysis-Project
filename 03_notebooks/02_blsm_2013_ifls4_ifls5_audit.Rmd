@@ -80,7 +80,17 @@ for (f in files) {
 }
 \`\`\`
 
-## Step 4 — Pretreatment covariates and heterogeneity audit (planned)
+## Step 4 — Audit interview dates and 2014 exposure contamination
+
+Run the metadata scan below and inspect variable labels to determine precisely when IFLS5 interviews took place. This is particularly important when distinguishing 2013 BLSM from late-2014 payments.
+
+```{r interview-timing-audit, eval=FALSE}
+source("02_scripts/10_blsm_2013/04_interview_calendar_audit.R")
+```
+
+Review `11_interview_date_variable_candidates.csv`. Confirm exact day/month/year codes from the questionnaire before classifying treatment as pre-interview.
+
+## Step 5 — Pretreatment covariates and heterogeneity audit (planned)
 
 Candidate baseline \`X\`: real IFLS4 welfare and asset ownership, household size/composition, household-head education, employment, pre-existing cash assistance, urban/rural status, and region. Restrict to information known **before BLSM 2013**, and consider whether some IFLS4 reports are already affected by older BLT programs.
 
@@ -91,13 +101,13 @@ Prespecified subgroup ATT:
 
 **Avoid:** using 2014/15 poverty to define heterogeneity; it is post-treatment.
 
-## Step 5 — Observational ATT identification (planned; no model yet)
+## Step 6 — Observational ATT identification (planned; no model yet)
 
 Candidate design: doubly robust **panel DiD ATT** with baseline-covariate adjustment, conditional parallel trends, overlap, consistency, and no problematic spillovers. An ATT estimate is only credible if these assumptions are defensible. With two waves we cannot directly test pre-treatment parallel trends for welfare. Plan sensitivity to the 2013 fuel-price shock, program targeting, other assistance, attrition, measurement error, and inference that respects household clustering / survey design.
 
 **No LATE without a valid instrument.** A KPS card or eligibility indicator cannot automatically be used as an IV; its assignment mechanism and exclusion restriction must be established.
 
-## Step 6 — RAPSEM feasibility (future, separately identified)
+## Step 7 — RAPSEM feasibility (future, separately identified)
 
 RAPSEM estimates controlled direct and mediator effects, **not automatically ATT**. To apply it to observational BLSM receipt we would need:
 - A validated treatment ignorability argument or an explicitly developed alternative;
