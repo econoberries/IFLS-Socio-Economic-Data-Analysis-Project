@@ -6,7 +6,7 @@ import sys
 import pandas as pd
 import pyreadstat
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[4]
 CODE = ROOT / "02_scripts" / "10_blsm_2013" / "python"
 sys.path.insert(0, str(CODE))
 import audit_common as a
