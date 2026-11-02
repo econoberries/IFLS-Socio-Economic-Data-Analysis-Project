@@ -1,0 +1,4 @@
+# Install inside a virtual environment; versions can be pinned after first run.
+pandas>=2.2,<4
+numpy>=1.26,<3
+pyreadstat>=1.2.0,<2
