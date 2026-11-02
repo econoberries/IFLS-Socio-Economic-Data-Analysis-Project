@@ -1,0 +1,27 @@
+name: BLSM Python synthetic audit tests
+on:
+  push:
+    paths:
+      - '02_scripts/10_blsm_2013/python/**'
+      - '.github/workflows/blsm-python-audit.yml'
+  pull_request:
+    paths:
+      - '02_scripts/10_blsm_2013/python/**'
+      - '.github/workflows/blsm-python-audit.yml'
+
+jobs:
+  audit-sanity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install packages
+        run: |
+          python -m pip install -r 02_scripts/10_blsm_2013/python/requirements.txt
+          python -m pip install pytest
+      - name: Run synthetic-data tests
+        run: python -m pytest -q 02_scripts/10_blsm_2013/python/tests
+      - name: Verify script syntax
+        run: python -m compileall -q 02_scripts/10_blsm_2013/python
