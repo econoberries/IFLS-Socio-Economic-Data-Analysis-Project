@@ -1,0 +1,22 @@
+{
+ "approved": false,
+ "notes": "These are templates, NOT approved IFLS expenditure formulas. Check every variable, reference period, and household size definition against IFLS3 and IFLS5 codebooks. Construct month-equivalent nominal Rupiah values without double-counting and include own production when appropriate.",
+ "components": {
+   "ifls3": [
+     {"file":"b1_ks1","household":"hhid00","item_column":"ks1type","include_codes":[],"all_rows_approved":false,"amount_columns":[],"multiply_to_monthly":4.333333333333333,"notes":"Weekly food; include purchases and own production only after verifying fields."},
+     {"file":"b1_ks2","household":"hhid00","item_column":"ks2type","include_codes":[],"all_rows_approved":false,"amount_columns":[],"multiply_to_monthly":1,"notes":"Monthly nonfood."},
+     {"file":"b1_ks3","household":"hhid00","item_column":"ks3type","include_codes":[],"all_rows_approved":false,"amount_columns":[],"multiply_to_monthly":0.08333333333333333,"notes":"Annual nonfood."}
+   ],
+   "ifls5": [
+     {"file":"b1_ks1","household":"hhid14","item_column":"ks1type","include_codes":[],"all_rows_approved":false,"amount_columns":[],"multiply_to_monthly":4.333333333333333,"notes":"Weekly food; validate 2014/15 questionnaire fields."},
+     {"file":"b1_ks2","household":"hhid14","item_column":"ks2type","include_codes":[],"all_rows_approved":false,"amount_columns":[],"multiply_to_monthly":1,"notes":"Monthly nonfood."},
+     {"file":"b1_ks3","household":"hhid14","item_column":"ks3type","include_codes":[],"all_rows_approved":false,"amount_columns":[],"multiply_to_monthly":0.08333333333333333,"notes":"Annual nonfood."}
+   ]
+ },
+ "extra_ks0_items": "IMPORTANT: KS0 aggregates and other expenditure items may be needed. This builder excludes KS0 until explicitly mapped and approved. Do not call resulting PCE complete if components are omitted.",
+ "basket_complete_ifls3": false,
+ "basket_complete_ifls5": false,
+ "missing_codes": [],
+ "poverty_lines_file": "01_data/04_intermediate/rapsem_blt2005/poverty_lines_household.csv",
+ "poverty_line_notes": "Required columns: wave,hhid,monthly_poverty_line. Build from documented BPS official thresholds matched to actual interview year and geography; no price levels are invented."
+}

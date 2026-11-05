@@ -1,0 +1,34 @@
+{
+  "instructions": "ALL UNVERIFIED FIELDS ARE NULL OR EMPTY. Inspect 01/02 audit outputs plus IFLS3/4/5 questionnaires, fill them, and change approved flags only after review.",
+  "rosters": {
+    "ifls3": {"approved": false,"file": "bk_ar1", "pid": "pidlink", "household": "hhid00", "membership": "ar01a", "current_codes": [], "age": "ar09"},
+    "ifls4": {"approved": false,"file": "bk_ar1", "pid": "pidlink", "household": "hhid07", "membership": "ar01a", "current_codes": [], "age": "ar09"},
+    "ifls5": {"approved": false,"file": "bk_ar1", "pid": "pidlink", "household": "hhid14", "membership": "ar01a", "current_codes": [], "age": "ar09"}
+  },
+  "treatment": {
+    "approved": false,
+    "exposure_assignment_verified": false,
+    "wave": "ifls4", "file": "b1_ksr1", "household": "hhid07",
+    "program_selector_column": null, "program_selector_codes": [],
+    "receipt_column": null, "treated_codes": [], "untreated_codes": [],
+    "receipt_year_column": null, "receipt_year_codes": ["2005", "2006"],
+    "notes": "Use IFLS4 KSR and codebook to verify BLT I 2005/06 codes. If rows are absent, do not interpret absence as nonreceipt. Verify timing and 2005-to-2007 household changes."
+  },
+  "mediator": {
+    "approved": false,
+    "wave": "ifls4", "file": "b3b_kp", "pid": "pidlink",
+    "format": "long", "item_column": "kptype", "response_column": "kp02",
+    "item_code_map": {"A": null,"B": null,"C": null,"D": null,"E": null,"F": null,"G": null,"H": null,"I": null,"J": null},
+    "valid_response_codes": [], "missing_response_codes": [],
+    "notes": "Do not reverse-code or calculate a summed distress score here. These are raw CES-D items for CFA; confirm item direction in the questionnaire."
+  },
+  "baseline_covariates": [],
+  "welfare": {
+    "approved": false,
+    "file": "01_data/04_intermediate/rapsem_blt2005/household_welfare_harmonized.csv",
+    "wave_column": "wave", "household_column": "hhid",
+    "pce_column": "monthly_pce", "poverty_line_column": "monthly_poverty_line",
+    "notes": "Supply verified, comparable nominal PCE and location- and survey-year-specific poverty line in same units. See 03_build_welfare.py or use validated external aggregate."
+  },
+  "analysis": {"minimum_age_ifls3": 18, "baseline_poor_only": true}
+}
