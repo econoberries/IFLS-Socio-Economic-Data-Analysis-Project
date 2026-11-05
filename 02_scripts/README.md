@@ -42,3 +42,17 @@ python 02_scripts/10_blsm_2013/python/04_interview_calendar_audit.py
 ```
 
 A matching Jupyter notebook is available at [`03_notebooks/02_blsm_2013_ifls4_ifls5_audit_py.ipynb`](../03_notebooks/02_blsm_2013_ifls4_ifls5_audit_py.ipynb). No conversion to CSV is necessary: `pyreadstat` reads the original Stata files with value-label metadata. The earlier R scripts remain as optional references.
+
+
+## RAPSEM BLT 2005–2006 Python preparation
+
+See [20_rapsem_blt2005/README.md](20_rapsem_blt2005/README.md) for installation, source directory placement, variable code verification, and the conditional builder steps. From the directory containing \`IFLS_Project.Rproj\`:
+
+\`\`\`bash
+python -m pip install -r 02_scripts/20_rapsem_blt2005/requirements.txt
+python 02_scripts/20_rapsem_blt2005/00_setup.py
+python 02_scripts/20_rapsem_blt2005/01_inventory.py
+python 02_scripts/20_rapsem_blt2005/02_candidate_audit.py
+\`\`\`
+
+Do not run welfare/panel builders until local, untracked \`study_config.json\` and \`welfare_basket.json\` are verified and approved.

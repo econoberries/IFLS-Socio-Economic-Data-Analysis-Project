@@ -48,3 +48,12 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .ipynb_checkpoints/
+
+
+# Private study-specific verified code mappings and consumption specifications.
+02_scripts/20_rapsem_blt2005/study_config.json
+02_scripts/20_rapsem_blt2005/welfare_basket.json
+
+# Safe empty template: never add completed household poverty-line tables.
+!00_documentation/general/
+!00_documentation/general/poverty_lines_household.template.csv

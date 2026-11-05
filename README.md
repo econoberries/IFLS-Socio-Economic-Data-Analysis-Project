@@ -204,3 +204,16 @@ not read or modify your IFLS data.
 - [haven: reading Stata files and imported labels](https://haven.tidyverse.org/reference/read_dta.html)
 - [haven: tagged missing values](https://haven.tidyverse.org/reference/tagged_na.html)
 - [readr: writing CSV files](https://readr.tidyverse.org/reference/write_delim.html)
+
+
+## New study module: RAPSEM mediation of BLT 2005–2006
+
+The Python-first **BLT 2005–2006 → CES-D distress (IFLS4) → household welfare (IFLS5)** preparation workflow is maintained separately from the BLSM 2013 study.
+
+- **Full instructions:** [02_scripts/20_rapsem_blt2005/README.md](02_scripts/20_rapsem_blt2005/README.md).
+- **Data:** download IFLS3 (2000), IFLS4 (2007–08), and IFLS5 (2014–15) Stata household files; place each in its own \`01_data/01_raw_dta/iflsN/household/\` directory.
+- **Start:** run \`python 02_scripts/20_rapsem_blt2005/00_setup.py\`, then \`01_inventory.py\` and \`02_candidate_audit.py\`.
+- **Do not run the builders yet:** treatment receipt codes, roster membership codes, CES-D item codes, and poverty lines require verification first.
+- **Privacy:** no raw observations, local configuration files, or analysis panels are committed to GitHub.
+
+**Identification warning:** the published RAPSEM R estimator assumes randomized treatment; observational BLT mediation requires a separate identification argument and validated extension. This module prepares data only; it does **not** estimate ATT or causal mediation effects.
