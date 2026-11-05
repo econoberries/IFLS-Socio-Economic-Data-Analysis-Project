@@ -51,14 +51,19 @@ Existing `02_scripts/10_blsm_2013/` and IFLS conversion scripts are left untouch
 
 ## 1. Prepare Python (Mac Terminal)
 
-Run from the project root:
+Install **Python 3.12** from [python.org](https://www.python.org/downloads/) first, if needed. Do not replace the Python version managed by macOS. Run from the project root (the directory containing `IFLS_Project.Rproj`):
 
 ```bash
-python3 -m venv .venv
+# First-time setup (create .venv only once).
+python3.12 --version
+python3.12 -m venv .venv
 source .venv/bin/activate
+python -m pip install --upgrade pip
 python -m pip install -r 02_scripts/20_rapsem_blt2005/requirements.txt
 python 02_scripts/20_rapsem_blt2005/00_setup.py
 ```
+
+**On future visits**, do not recreate `.venv` or reinstall everything. From the project root, run `source .venv/bin/activate`, verify `python --version`, and run the relevant audit script. Use `deactivate` when finished. On this Mac, unqualified `python3` may refer to the older system Python 3.9; use `python3.12` for creating the virtual environment.
 
 `00_setup.py` creates missing directories only. It **never** moves or overwrites raw data.
 
@@ -95,7 +100,14 @@ A module marked with `*` may have several differently numbered data files. The *
 ```bash
 python 02_scripts/20_rapsem_blt2005/01_inventory.py
 python 02_scripts/20_rapsem_blt2005/02_candidate_audit.py
+python 02_scripts/20_rapsem_blt2005/02a_review_audit_reports.py
+python 02_scripts/20_rapsem_blt2005/02b_focused_code_audit.py
 ```
+
+The two extra, **re-runnable** checks are:
+
+- `02a_review_audit_reports.py`: summarizes the existing inventory, candidate file counts, unfiltered PIDLINK overlap and key response-code frequencies. It requires the earlier two reports and writes no new files.
+- `02b_focused_code_audit.py`: reads IFLS4 `b1_ksr1.dta` and `b3b_kp.dta` without changing them, displays treatment/mediator code cross-tabs and KP02 missingness, and writes only aggregate CSV tables named `02b_*.csv` to `05_outputs/tables/rapsem_blt2005/`. If `KP01` is absent, it reports that fact instead of inferring a screening mechanism.
 
 Examine these reports in `05_outputs/tables/rapsem_blt2005/`:
 
@@ -225,15 +237,20 @@ Your existing `.gitignore` ignores `01_data/**`, `00_documentation/**`, and `05_
 ## Run-order summary
 
 ```bash
-# In the folder containing IFLS_Project.Rproj
-python3 -m venv .venv
+# In the folder containing IFLS_Project.Rproj (one-time setup):
+python3.12 -m venv .venv
 source .venv/bin/activate
+python -m pip install --upgrade pip
 python -m pip install -r 02_scripts/20_rapsem_blt2005/requirements.txt
 python 02_scripts/20_rapsem_blt2005/00_setup.py
+
+# On future terminal sessions, just activate with: source .venv/bin/activate
 
 # After putting IFLS3/4/5 .dta files in separate wave folders:
 python 02_scripts/20_rapsem_blt2005/01_inventory.py
 python 02_scripts/20_rapsem_blt2005/02_candidate_audit.py
+python 02_scripts/20_rapsem_blt2005/02a_review_audit_reports.py
+python 02_scripts/20_rapsem_blt2005/02b_focused_code_audit.py
 
 # MANUAL GATE: verify variables, codes, poverty thresholds and treatment attribution;
 # complete study_config.json; prepare welfare_basket.json if using Route B.
