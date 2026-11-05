@@ -38,6 +38,9 @@ RAPSEM_SETUP_README.md
     00_setup.py
     01_inventory.py
     02_candidate_audit.py
+    02a_review_audit_reports.py
+    02b_focused_code_audit.py
+    02c_measurement_validation.py
     03_build_welfare.py
     04_build_panel.py
     05_quality_report.py
@@ -102,12 +105,14 @@ python 02_scripts/20_rapsem_blt2005/01_inventory.py
 python 02_scripts/20_rapsem_blt2005/02_candidate_audit.py
 python 02_scripts/20_rapsem_blt2005/02a_review_audit_reports.py
 python 02_scripts/20_rapsem_blt2005/02b_focused_code_audit.py
+python 02_scripts/20_rapsem_blt2005/02c_measurement_validation.py
 ```
 
 The two extra, **re-runnable** checks are:
 
 - `02a_review_audit_reports.py`: summarizes the existing inventory, candidate file counts, unfiltered PIDLINK overlap and key response-code frequencies. It requires the earlier two reports and writes no new files.
 - `02b_focused_code_audit.py`: reads IFLS4 `b1_ksr1.dta` and `b3b_kp.dta` without changing them, displays treatment/mediator code cross-tabs and KP02 missingness, and writes only aggregate CSV tables named `02b_*.csv` to `05_outputs/tables/rapsem_blt2005/`. If `KP01` is absent, it reports that fact instead of inferring a screening mechanism.
+- `02c_measurement_validation.py`: checks whether IFLS4 cash-transfer records are unique at the HHID07 × program level, compares reported receipt years, audits unique A–J CES-D item rows per PIDLINK, and summarizes the KP01/KP02 response pattern. Writes aggregate-only `02c_*.csv` reports and a checklist of questionnaire decisions **not yet verified**. It neither assigns treatment nor constructs CES-D scores.
 
 Examine these reports in `05_outputs/tables/rapsem_blt2005/`:
 
@@ -251,6 +256,7 @@ python 02_scripts/20_rapsem_blt2005/01_inventory.py
 python 02_scripts/20_rapsem_blt2005/02_candidate_audit.py
 python 02_scripts/20_rapsem_blt2005/02a_review_audit_reports.py
 python 02_scripts/20_rapsem_blt2005/02b_focused_code_audit.py
+python 02_scripts/20_rapsem_blt2005/02c_measurement_validation.py
 
 # MANUAL GATE: verify variables, codes, poverty thresholds and treatment attribution;
 # complete study_config.json; prepare welfare_basket.json if using Route B.
