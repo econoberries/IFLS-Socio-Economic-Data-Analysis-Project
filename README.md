@@ -211,8 +211,8 @@ not read or modify your IFLS data.
 The Python-first **BLT 2005–2006 → CES-D distress (IFLS4) → household welfare (IFLS5)** preparation workflow is maintained separately from the BLSM 2013 study.
 
 - **Full instructions:** [02_scripts/20_rapsem_blt2005/README.md](02_scripts/20_rapsem_blt2005/README.md).
-- **Data:** download IFLS3 (2000), IFLS4 (2007–08), and IFLS5 (2014–15) Stata household files; place each in its own \`01_data/01_raw_dta/iflsN/household/\` directory.
-- **Start:** run \`python 02_scripts/20_rapsem_blt2005/00_setup.py\`, then \`01_inventory.py\` and \`02_candidate_audit.py\`.
+- **Data:** download IFLS3 (2000), IFLS4 (2007–08), and IFLS5 (2014–15) Stata household files; place each in its own `01_data/01_raw_dta/iflsN/household/` directory.
+- **Start:** run `python 02_scripts/20_rapsem_blt2005/00_setup.py`, then `01_inventory.py` and `02_candidate_audit.py`.
 - **Do not run the builders yet:** treatment receipt codes, roster membership codes, CES-D item codes, and poverty lines require verification first.
 - **Privacy:** no raw observations, local configuration files, or analysis panels are committed to GitHub.
 
