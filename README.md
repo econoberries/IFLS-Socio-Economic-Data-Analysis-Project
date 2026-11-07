@@ -213,7 +213,7 @@ The Python-first **BLT 2005–2006 → CES-D distress (IFLS4) → household welf
 - **Full instructions:** [02_scripts/20_rapsem_blt2005/README.md](02_scripts/20_rapsem_blt2005/README.md).
 - **Data:** download IFLS3 (2000), IFLS4 (2007–08), and IFLS5 (2014–15) Stata household files; place each in its own `01_data/01_raw_dta/iflsN/household/` directory.
 - **Python setup:** use Python 3.12 in a project `.venv`, then install `02_scripts/20_rapsem_blt2005/requirements.txt`; complete commands are in the [study README](02_scripts/20_rapsem_blt2005/README.md).
-- **Start:** run `00_setup.py`, `01_inventory.py`, `02_candidate_audit.py`, then reusable reviews `02a_review_audit_reports.py`, `02b_focused_code_audit.py`, and `02c_measurement_validation.py`.
+- **Start:** run `00_setup.py`, `01_inventory.py`, `02_candidate_audit.py`, then reusable reviews `02a_review_audit_reports.py`, `02b_focused_code_audit.py`, and `02c_measurement_validation.py`, then review provisional candidate measures from `03a_build_blt_treatment.py` and `03b_build_cesd_indicators.py` (aggregate reports only by default).
 - **Do not run the builders yet:** treatment receipt codes, roster membership codes, CES-D item codes, and poverty lines require verification first.
 - **Privacy:** no raw observations, local configuration files, or analysis panels are committed to GitHub.
 
