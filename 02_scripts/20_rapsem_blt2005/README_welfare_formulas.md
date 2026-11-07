@@ -223,6 +223,57 @@ Indonesian poverty line**.
 
 ## 7. What files and settings are needed?
 
+
+### Why `git pull` does not provide `welfare_basket.json`
+
+The Python script has a **Section 1: LOAD CONFIGURATION**, but the
+configuration *values* live in two local JSON files. They are intentionally
+not committed to GitHub:
+
+| File | Purpose | GitHub status |
+|---|---|---|
+| `welfare_basket.example.json` | Template for expenditure items, amounts, monthly factors, missing codes, poverty-line path | Tracked |
+| `welfare_basket.json` | Your reviewed, local IFLS3/IFLS5 consumption mapping | Git-ignored |
+| `study_config.example.json` | Template for baseline/person roster and other study inputs | Tracked |
+| `study_config.json` | Your reviewed, local roster membership codes and study settings | Git-ignored |
+
+If these local files are **not already present**, create them from the
+templates in the project root:
+
+```bash
+cp 02_scripts/20_rapsem_blt2005/welfare_basket.example.json \
+   02_scripts/20_rapsem_blt2005/welfare_basket.json
+
+cp 02_scripts/20_rapsem_blt2005/study_config.example.json \
+   02_scripts/20_rapsem_blt2005/study_config.json
+```
+
+**Do not run `cp` again if you already filled in these local files**:
+copying would overwrite your research mapping. The templates have
+`approved: false`, blank amount columns, and incomplete basket flags.
+Those blanks are deliberate—not a defect of `git pull`.
+Verify IFLS3 and IFLS5 KS codebooks, consumption coverage, and
+wave-specific roster membership rules **before** approving the files.
+
+The simplified `03_build_welfare.py` now displays the same numbered
+sections as our learning example:
+
+1. Load configuration
+2. Calculate household size
+3. Calculate one expenditure component
+4. Build household expenditure for each wave
+5. Combine IFLS3 and IFLS5
+6. Merge verified poverty lines
+7. Calculate poverty variables
+8. Create audit reports
+9. Save the private welfare dataset
+
+For easy synthetic testing, Section 1 uses a `load_configuration()`
+function, called inside `main()`, rather than trying to open local
+files whenever a test imports the script. The calculations themselves
+are unchanged.
+
+
 The script reads:
 
 1. Local source `.dta` files for IFLS3 and IFLS5 (recursively under
