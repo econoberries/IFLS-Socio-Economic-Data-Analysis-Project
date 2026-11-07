@@ -56,6 +56,9 @@ python 02_scripts/20_rapsem_blt2005/02_candidate_audit.py
 python 02_scripts/20_rapsem_blt2005/02a_review_audit_reports.py
 python 02_scripts/20_rapsem_blt2005/02b_focused_code_audit.py
 python 02_scripts/20_rapsem_blt2005/02c_measurement_validation.py
+python 02_scripts/20_rapsem_blt2005/03a_build_blt_treatment.py
+python 02_scripts/20_rapsem_blt2005/03b_build_cesd_indicators.py
+python -m pytest 02_scripts/20_rapsem_blt2005/tests/test_candidate_measurement.py -q
 ```
 
-Do not run welfare/panel builders until local, untracked `study_config.json` and `welfare_basket.json` are verified and approved.
+The 03a/03b scripts produce **aggregate-only provisional classifications** by default. See [measurement rules](20_rapsem_blt2005/measurement_rules_ifls4.md). Do not run welfare/panel builders until welfare inputs, local mappings and historical treatment linkage are approved; the current panel builder must first be updated to use KP01/KP02 jointly.
