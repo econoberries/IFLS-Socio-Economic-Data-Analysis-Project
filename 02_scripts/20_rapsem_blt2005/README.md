@@ -41,6 +41,10 @@ RAPSEM_SETUP_README.md
     02a_review_audit_reports.py
     02b_focused_code_audit.py
     02c_measurement_validation.py
+    03a_build_blt_treatment.py
+    03b_build_cesd_indicators.py
+    measurement_rules_ifls4.md
+    tests/test_candidate_measurement.py
     03_build_welfare.py
     04_build_panel.py
     05_quality_report.py
@@ -121,6 +125,47 @@ Examine these reports in `05_outputs/tables/rapsem_blt2005/`:
 3. `01_research_variable_candidates.csv`: broad keyword shortlist, useful for the research variable audit.
 4. `02_response_code_frequencies.csv`: observed `KSR*`, `KPTYPE`, `KP02`, `AR01A` codes and sample counts (aggregated only).
 5. `02_unfiltered_pidlink_overlap.csv`: raw ID overlap **not** the final eligible sample.
+
+### 3A. Build **provisional**, separately audited IFLS4 measures
+
+After reviewing Book 1 Section KSR (p. 9), Book 3B Section KP (p. 12),
+and the special-code rules in the IFLS4 User's Guide Volume 2, run:
+
+\`\`\`bash
+# Aggregates only (safe to re-run; source .dta files are unchanged).
+python 02_scripts/20_rapsem_blt2005/03a_build_blt_treatment.py
+python 02_scripts/20_rapsem_blt2005/03b_build_cesd_indicators.py
+
+# Test the candidate coding functions on synthetic responses (no IFLS data).
+python -m pytest 02_scripts/20_rapsem_blt2005/tests/test_candidate_measurement.py -q
+\`\`\`
+
+These two scripts generate \`03a_*.csv\` and \`03b_*.csv\` aggregate tables in
+\`05_outputs/tables/rapsem_blt2005/\`. The first script distinguishes confirmed
+BLT-A nonrecipients from recipients who report first receipt in 2005/2006 and
+other/unknown years. The second reconstructs CES-D frequency including KP01=3
+skips and reverses hopeful/happy items E and H. It does not compute a sum score
+or latent factor.
+
+**Only after inspecting aggregate outputs**, optionally export private
+household/person-level candidate datasets:
+
+\`\`\`bash
+python 02_scripts/20_rapsem_blt2005/03a_build_blt_treatment.py --write-private
+python 02_scripts/20_rapsem_blt2005/03b_build_cesd_indicators.py --write-private
+\`\`\`
+
+The scripts refuse to overwrite local candidate CSVs in \`01_data/\`.
+Do **not** commit these files. Read
+[measurement_rules_ifls4.md](measurement_rules_ifls4.md) for the distinction
+between questionnaire facts and researcher-chosen scoring.
+
+**Important compatibility warning:** These candidate files are *not* yet inputs
+to \`04_build_panel.py\`. Its earlier implementation reads \`KP02\` alone and
+does **not** reconstruct skip-dependent item scores; running that panel builder
+with a raw-KP02 mapping would produce incorrect mediator availability. It must
+be updated and validated once the candidate measures and linkage design are
+approved. Do not proceed to \`04_build_panel.py\` yet.
 
 **Stop here until the questionnaire/codebook agrees with our planned variable mapping.** We especially need to verify:
 
@@ -258,13 +303,20 @@ python 02_scripts/20_rapsem_blt2005/02a_review_audit_reports.py
 python 02_scripts/20_rapsem_blt2005/02b_focused_code_audit.py
 python 02_scripts/20_rapsem_blt2005/02c_measurement_validation.py
 
+# Questionnaire-informed provisional measures and synthetic tests:
+python 02_scripts/20_rapsem_blt2005/03a_build_blt_treatment.py
+python 02_scripts/20_rapsem_blt2005/03b_build_cesd_indicators.py
+python -m pytest 02_scripts/20_rapsem_blt2005/tests/test_candidate_measurement.py -q
+
 # MANUAL GATE: verify variables, codes, poverty thresholds and treatment attribution;
 # complete study_config.json; prepare welfare_basket.json if using Route B.
 
 # Only after welfare basket + poverty thresholds are verified (Route B):
 python 02_scripts/20_rapsem_blt2005/03_build_welfare.py
 
-# Only after treatment, mediator, roster and welfare configuration is approved:
+# NOT YET: 04_build_panel.py needs KP01/KP02 skip handling and review of
+#          household-to-person treatment assignment before any final panel.
+# After its revised implementation is approved:
 python 02_scripts/20_rapsem_blt2005/04_build_panel.py
 python 02_scripts/20_rapsem_blt2005/05_quality_report.py
 ```
