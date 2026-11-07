@@ -71,7 +71,7 @@ def classify_blt(data):
         raise ValueError("Some household IDs are missing.")
 
     if blt["hhid07"].duplicated().any():
-        raise ValueError("Duplicate household IDs found.")
+        raise ValueError("Found duplicate household IDs.")
 
     # --------------------------------------------------------
     # Identify BLT receipt
