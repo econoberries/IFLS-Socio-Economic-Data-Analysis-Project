@@ -1,136 +1,307 @@
 """
-03a_build_blt_treatment.py — PROVISIONAL IFLS4 BLT household treatment.
+03a_build_blt_treatment.py
 
-The IFLS4 Book 1 KSR questionnaire (p. 9) establishes:
-  KSR3TYPE A = Bantuan Langsung Tunai (unconditional cash transfer)
-  KSR17: 1 = yes, 3 = no; other codes require review
-  KSR18Y = year of first receipt, KSR22Y = year of last receipt
+Identify households that received BLT in IFLS4.
 
-A reported "yes" with first receipt in 2005 or 2006 is a candidate for
-2005–2006 BLT exposure. Other/unknown dates are NOT coded as controls.
-The resulting indicator is not an approved historical household assignment.
+Source:
+    IFLS4 Book 1, Section KSR, page 9
+    Dataset: b1_ksr1.dta
 
-Runs from the project root. Original Stata files are never changed.
-Default: aggregate reports only (no household data exported).
-Optional: --write-private saves candidate household records to ignored
-          01_data/04_intermediate/rapsem_blt2005/; never overwrites.
+Important variables:
+    KSR3TYPE = A : BLT (unconditional cash transfer)
+    KSR17 = 1    : Received BLT
+    KSR17 = 3    : Did not receive BLT
+    KSR18Y       : Year of first receipt
+    KSR22Y       : Year of last receipt
 
-    python 02_scripts/20_rapsem_blt2005/03a_build_blt_treatment.py
-    python 02_scripts/20_rapsem_blt2005/03a_build_blt_treatment.py --write-private
+This script:
+1. Selects households in the BLT program.
+2. Classifies reported BLT receipt in 2005-2006.
+3. Checks unusual responses and receipt years.
+4. Saves summary reports.
+
+Original IFLS data are never modified.
+Household-level data are saved only with --write-private.
 """
-import argparse
 
+import argparse
 import pandas as pd
 
-from common import normalized, require_columns, save_private, save_report, stata
+from common import (
+    stata,
+    normalized,
+    require_columns,
+    save_report,
+    save_private,
+)
 
 
-def classify_blt(df):
-    """Return private, non-approved HHID07-level records and check anomalies."""
-    needed = ["hhid07", "ksr3type", "ksr17", "ksr18y", "ksr22y"]
-    require_columns(df, needed, "IFLS4 b1_ksr1")
-    df = df.loc[normalized(df["ksr3type"]).eq("A")].copy()
-    if df.empty:
-        raise ValueError("No program-A records found; verify KSR3TYPE in IFLS4.")
+# ============================================================
+# 1. CLASSIFY BLT RECIPIENTS
+# ============================================================
 
-    out = pd.DataFrame(index=df.index)
-    out["hhid07"] = normalized(df["hhid07"])
-    if out["hhid07"].isna().any() or out["hhid07"].duplicated().any():
-        raise ValueError("Missing/duplicate HHID07 within BLT program A. Stop; investigate.")
+def classify_blt(data):
 
-    for col in ["ksr3type", "ksr17", "ksr18y", "ksr22y"]:
-        out[col] = normalized(df[col])
+    # Variables needed from IFLS4
+    columns = [
+        "hhid07",
+        "ksr3type",
+        "ksr17",
+        "ksr18y",
+        "ksr22y",
+    ]
 
-    yes = out["ksr17"].eq("1").fillna(False)
-    no = out["ksr17"].eq("3").fillna(False)
-    first = out["ksr18y"]
-    expected_first = first.isin(["2005", "2006"]).fillna(False)
+    require_columns(data, columns, "IFLS4 b1_ksr1")
 
-    out["classification"] = "unknown_or_special_receipt_code"
-    out.loc[no, "classification"] = "reported_no"
-    out.loc[yes & expected_first, "classification"] = "yes_first_2005_or_2006"
-    other_year = pd.to_numeric(first, errors="coerce")
-    plausible_other = other_year.between(1900, 2100).fillna(False) & ~expected_first
-    out.loc[yes & plausible_other, "classification"] = "yes_first_other_year"
-    out.loc[yes & ~expected_first & ~plausible_other,
-            "classification"] = "yes_first_year_missing_or_special"
+    # Keep only program A (BLT)
+    blt = data.loc[
+        normalized(data["ksr3type"]) == "A",
+        columns
+    ].copy()
 
-    out["blt_2005_06_candidate"] = pd.Series(pd.NA, index=out.index, dtype="Int64")
-    out.loc[no, "blt_2005_06_candidate"] = 0
-    out.loc[yes & expected_first, "blt_2005_06_candidate"] = 1
+    if blt.empty:
+        raise ValueError("No BLT program A records found.")
 
-    last_year = pd.to_numeric(out["ksr22y"], errors="coerce")
-    first_year = pd.to_numeric(out["ksr18y"], errors="coerce")
-    valid_first = first_year.where(first_year.between(1900, 2100))
-    valid_last = last_year.where(last_year.between(1900, 2100))
-    out["last_before_first"] = (
-        valid_first.notna() & valid_last.notna() & valid_last.lt(valid_first)
+    # Standardize variables for easier comparison
+    for column in columns:
+        blt[column] = normalized(blt[column])
+
+    # Every household should appear only once
+    if blt["hhid07"].isna().any():
+        raise ValueError("Some household IDs are missing.")
+
+    if blt["hhid07"].duplicated().any():
+        raise ValueError("Duplicate household IDs found.")
+
+    # --------------------------------------------------------
+    # Identify BLT receipt
+    # --------------------------------------------------------
+
+    received = blt["ksr17"].eq("1").fillna(False)
+    not_received = blt["ksr17"].eq("3").fillna(False)
+
+    first_year = blt["ksr18y"]
+
+    # Treatment period: 2005-2006
+    received_2005_06 = first_year.isin(["2005", "2006"])
+
+    # Identify other reported calendar years
+    numeric_year = pd.to_numeric(first_year, errors="coerce")
+
+    other_year = (
+        numeric_year.between(1900, 2100)
+        & ~received_2005_06
     )
-    out["nonreceipt_with_date"] = (
-        no & (out["ksr18y"].notna() | out["ksr22y"].notna())
-    )
-    return out
 
+    # --------------------------------------------------------
+    # Classify each household
+    # --------------------------------------------------------
+
+    blt["classification"] = "unknown_or_special_receipt_code"
+
+    blt.loc[
+        not_received, "classification"
+    ] = "reported_no"
+
+    blt.loc[
+        received & received_2005_06,
+        "classification"
+    ] = "yes_first_2005_or_2006"
+
+    blt.loc[
+        received & other_year,
+        "classification"
+    ] = "yes_first_other_year"
+
+    blt.loc[
+        received & ~received_2005_06 & ~other_year,
+        "classification"
+    ] = "yes_first_year_missing_or_special"
+
+    # --------------------------------------------------------
+    # Create candidate treatment indicator
+    # --------------------------------------------------------
+
+    # 1 = Reported BLT receipt, first received in 2005-2006
+    # 0 = Reported never receiving BLT
+    # NA = Unknown, ambiguous, or different receipt year
+
+    blt["blt_2005_06_candidate"] = pd.Series(
+        pd.NA,
+        index=blt.index,
+        dtype="Int64"
+    )
+
+    blt.loc[
+        not_received, "blt_2005_06_candidate"
+    ] = 0
+
+    blt.loc[
+        received & received_2005_06,
+        "blt_2005_06_candidate"
+    ] = 1
+
+    # --------------------------------------------------------
+    # Check possible inconsistencies
+    # --------------------------------------------------------
+
+    last_year = pd.to_numeric(
+        blt["ksr22y"], errors="coerce"
+    )
+
+    # Flag cases where the last receipt predates the first
+    blt["last_before_first"] = (
+        numeric_year.between(1900, 2100)
+        & last_year.between(1900, 2100)
+        & (last_year < numeric_year)
+    )
+
+    # A nonrecipient should normally not report receipt dates
+    blt["nonreceipt_with_date"] = (
+        not_received
+        & (
+            blt["ksr18y"].notna()
+            | blt["ksr22y"].notna()
+        )
+    )
+
+    return blt
+
+
+# ============================================================
+# 2. LOAD IFLS4 DATA AND RUN CLASSIFICATION
+# ============================================================
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+
+    # Optional command to save household-level data
+    parser = argparse.ArgumentParser()
+
     parser.add_argument(
-        "--write-private", action="store_true",
-        help="Save candidate HHID-level file locally; refuse to overwrite."
+        "--write-private",
+        action="store_true",
+        help="Save the household-level candidate dataset."
     )
+
     args = parser.parse_args()
 
-    source, _ = stata("ifls4", "b1_ksr1")
-    source.columns = source.columns.str.lower()
-    out = classify_blt(source)
+    # Load the original Stata dataset
+    data, _ = stata("ifls4", "b1_ksr1")
 
-    print("\n=== BLT PROGRAM A: CANDIDATE CLASSIFICATION ===")
+    data.columns = data.columns.str.lower()
+
+    # Classify BLT households
+    blt = classify_blt(data)
+
+    # --------------------------------------------------------
+    # 3. SUMMARY: BLT CLASSIFICATION
+    # --------------------------------------------------------
+
+    print("\n=== BLT CLASSIFICATION ===")
+
     summary = (
-        out.groupby(["classification", "ksr17"], dropna=False)
-        .size().reset_index(name="n_households")
+        blt.groupby(["classification", "ksr17"], dropna=False)
+        .size()
+        .reset_index(name="n_households")
         .rename(columns={"ksr17": "ksr17_code"})
         .sort_values("n_households", ascending=False)
     )
+
     print(summary.to_string(index=False))
-    save_report(summary, "03a_blt_candidate_classification.csv")
 
-    dates = (
-        out.groupby(["classification", "ksr18y", "ksr22y"], dropna=False)
-        .size().reset_index(name="n_households")
-        .rename(columns={"ksr18y": "first_year", "ksr22y": "last_year"})
+    save_report(
+        summary,
+        "03a_blt_candidate_classification.csv"
     )
-    save_report(dates, "03a_blt_candidate_year_patterns.csv")
 
-    quality = pd.DataFrame([
-        {"check": "program_A_households", "n": len(out)},
-        {"check": "candidate_treated_2005_06",
-         "n": int(out["blt_2005_06_candidate"].eq(1).sum())},
-        {"check": "reported_nonrecipients",
-         "n": int(out["blt_2005_06_candidate"].eq(0).sum())},
-        {"check": "unclassified_households",
-         "n": int(out["blt_2005_06_candidate"].isna().sum())},
-        {"check": "last_year_before_first_year",
-         "n": int(out["last_before_first"].sum())},
-        {"check": "reported_no_but_year_recorded",
-         "n": int(out["nonreceipt_with_date"].sum())},
-    ])
-    print("\n=== DATA QUALITY ===")
+    # --------------------------------------------------------
+    # 4. SUMMARY: RECEIPT YEARS
+    # --------------------------------------------------------
+
+    print("\n=== BLT RECEIPT YEARS ===")
+
+    year_summary = (
+        blt.groupby(
+            ["classification", "ksr18y", "ksr22y"],
+            dropna=False
+        )
+        .size()
+        .reset_index(name="n_households")
+    )
+
+    year_summary = year_summary.rename(columns={
+        "ksr18y": "first_year",
+        "ksr22y": "last_year",
+    })
+
+    save_report(
+        year_summary,
+        "03a_blt_candidate_year_patterns.csv"
+    )
+
+    # --------------------------------------------------------
+    # 5. DATA QUALITY CHECKS
+    # --------------------------------------------------------
+
+    print("\n=== DATA QUALITY CHECKS ===")
+
+    checks = {
+        "program_A_households": len(blt),
+
+        "candidate_treated_2005_06": (
+            blt["blt_2005_06_candidate"] == 1
+        ).sum(),
+
+        "reported_nonrecipients": (
+            blt["blt_2005_06_candidate"] == 0
+        ).sum(),
+
+        "unclassified_households": (
+            blt["blt_2005_06_candidate"].isna()
+        ).sum(),
+
+        "last_year_before_first_year": (
+            blt["last_before_first"].sum()
+        ),
+
+        "reported_no_but_year_recorded": (
+            blt["nonreceipt_with_date"].sum()
+        ),
+    }
+
+    quality = pd.DataFrame({
+        "check": list(checks.keys()),
+        "n": list(checks.values()),
+    })
+
     print(quality.to_string(index=False))
-    save_report(quality, "03a_blt_candidate_quality.csv")
+
+    save_report(
+        quality,
+        "03a_blt_candidate_quality.csv"
+    )
+
+    # --------------------------------------------------------
+    # 6. SAVE HOUSEHOLD DATA (OPTIONAL)
+    # --------------------------------------------------------
 
     if args.write_private:
+
         save_private(
-            out.reset_index(drop=True),
-            "blt2005_candidate_household_ifls4.csv",
+            blt.reset_index(drop=True),
+            "blt2005_candidate_household_ifls4.csv"
         )
+
     else:
-        print("\nNo household-level data exported. Use --write-private only after review.")
+        print("\nHousehold-level data were not exported.")
 
-    print(
-        "STOP: these are candidates, not an approved BLT 2005–06 exposure. "
-        "Verify historical household changes, selection, and ambiguous dates."
-    )
+    print("\nBLT candidate classification completed.")
+    print("Review the audit reports before using treatment status.")
 
+
+# ============================================================
+# 7. RUN SCRIPT
+# ============================================================
 
 if __name__ == "__main__":
     main()
