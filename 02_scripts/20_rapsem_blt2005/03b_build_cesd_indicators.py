@@ -1,147 +1,264 @@
 """
-03b_build_cesd_indicators.py — PROVISIONAL IFLS4 CES-D item construction.
+03b_build_cesd_indicators.py
 
-The IFLS4 Book 3B KP questionnaire (p. 12) establishes:
-  KP01: 1=yes (ask KP02), 3=no (skip KP02).
-  KP02: 1=rarely/<=1 day, 2=1–2 days, 3=3–4, 4=5–7 days.
-  KPTYPE: A through J. E (hopeful) and H (happy) are positive items.
+Construct provisional psychological distress indicators from IFLS4.
 
-Researcher-proposed mapping of an observed item to distress (0–3):
-  KP01=3 and KP02 blank -> raw frequency 0;
-  KP01=1 and KP02 in 1–4 -> raw frequency KP02-1;
-  invalid, inconsistent, or special codes -> missing.
-  Reverse positive items E and H: 3 - raw frequency.
+Source:
+    IFLS4 Book 3B, Section KP, page 12
+    Dataset: b3b_kp.dta
 
-The source verifies the survey responses, NOT that this derived ordinal
-scoring has measurement invariance or is validated for an SEM. No total
-score or latent factor is estimated.
+Important variables:
+    KPTYPE : Mental health item (A-J)
+    KP01   : Whether the person experienced the feeling
+    KP02   : How often the person experienced the feeling
 
-Runs from the project root. Original Stata files are never changed.
-Default: aggregate reports only.
-Optional: --write-private saves wide person-level candidates to ignored
-          01_data/04_intermediate/rapsem_blt2005/; no overwrite.
+This script:
+1. Checks the ten CES-D questionnaire items.
+2. Converts responses into frequency scores (0-3).
+3. Reverse-scores positive items E and H.
+4. Creates one row per individual.
+5. Saves aggregate audit reports.
 
-    python 02_scripts/20_rapsem_blt2005/03b_build_cesd_indicators.py
-    python 02_scripts/20_rapsem_blt2005/03b_build_cesd_indicators.py --write-private
+The scoring is provisional, not a validated latent mediator.
+Original IFLS data are never modified.
+Individual-level data are saved only with --write-private.
 """
 
 import argparse
-
 import pandas as pd
 
-from common import normalized, require_columns, save_private, save_report, stata
+from common import (
+    stata,
+    normalized,
+    require_columns,
+    save_report,
+    save_private,
+)
 
 
-ITEMS = tuple("ABCDEFGHIJ")
-POSITIVE_ITEMS = {"E", "H"}
+# ============================================================
+# 1. DEFINE CES-D ITEMS
+# ============================================================
+
+ITEMS = list("ABCDEFGHIJ")
+
+# Feeling hopeful (E) and happy (H) are positive feelings.
+POSITIVE_ITEMS = ["E", "H"]
 
 
-def build_cesd(df):
-    """Return aggregate-ready item table and local private-wide candidates."""
-    require_columns(df, ["pidlink", "kptype", "kp01", "kp02"], "IFLS4 b3b_kp")
+# ============================================================
+# 2. CONSTRUCT CES-D INDICATORS
+# ============================================================
 
-    frame = pd.DataFrame(index=df.index)
-    frame["pidlink"] = normalized(df["pidlink"])
-    frame["kptype"] = normalized(df["kptype"])
-    frame["kp01"] = normalized(df["kp01"])
-    frame["kp02"] = normalized(df["kp02"])
+def build_cesd(data):
 
-    if frame["pidlink"].isna().any():
-        raise ValueError("Missing PIDLINK in KP; do not discard records silently.")
-    if not frame["kptype"].isin(ITEMS).all():
-        raise ValueError("Unknown/missing KPTYPE. Audit before deriving CES-D.")
-    if frame.duplicated(["pidlink", "kptype"]).any():
-        raise ValueError("Duplicate PIDLINK x KPTYPE; do not pivot arbitrarily.")
+    columns = ["pidlink", "kptype", "kp01", "kp02"]
+    require_columns(data, columns, "IFLS4 b3b_kp")
 
-    by_person = frame.groupby("pidlink")["kptype"].agg(["size", "nunique"])
-    if not (by_person["size"].eq(10) & by_person["nunique"].eq(10)).all():
-        raise ValueError("Not every person has exactly ten unique A-J rows.")
+    # Keep only the columns we need.
+    cesd = data[columns].copy()
 
-    no = frame["kp01"].eq("3").fillna(False)
-    yes = frame["kp01"].eq("1").fillna(False)
-    skip = no & frame["kp02"].isna()
-    valid_yes = yes & frame["kp02"].isin(["1", "2", "3", "4"]).fillna(False)
+    # Standardize all codes to strings, including numeric codes.
+    for column in columns:
+        cesd[column] = normalized(cesd[column])
 
-    frame["coding_reason"] = "unverified_or_special_code"
-    frame.loc[no & frame["kp02"].notna(), "coding_reason"] = "inconsistent_no_with_frequency"
-    frame.loc[yes & ~valid_yes, "coding_reason"] = "yes_frequency_missing_or_special"
-    frame.loc[skip, "coding_reason"] = "valid_no_skip"
-    frame.loc[valid_yes, "coding_reason"] = "valid_yes_frequency"
+    # Check individual IDs and questionnaire item codes.
+    if cesd["pidlink"].isna().any():
+        raise ValueError("Some individual IDs are missing.")
 
-    frequency = pd.Series(pd.NA, index=frame.index, dtype="Int64")
-    frequency.loc[skip] = 0
-    frequency.loc[valid_yes] = (
-        pd.to_numeric(frame.loc[valid_yes, "kp02"]) - 1
+    if not cesd["kptype"].isin(ITEMS).all():
+        raise ValueError("Unknown CES-D item codes found.")
+
+    if cesd.duplicated(["pidlink", "kptype"]).any():
+        raise ValueError("Duplicate CES-D items found for a person.")
+
+    # Each individual should have exactly ten distinct A-J items.
+    item_counts = cesd.groupby("pidlink")["kptype"].nunique()
+
+    if not item_counts.eq(10).all():
+        raise ValueError("Some individuals do not have all ten CES-D items.")
+
+    # --------------------------------------------------------
+    # Interpret questionnaire responses.
+    # --------------------------------------------------------
+
+    # KP01 = 1: Yes, experienced this feeling.
+    # KP01 = 3: No, did not experience this feeling.
+    yes = cesd["kp01"].eq("1").fillna(False)
+    no = cesd["kp01"].eq("3").fillna(False)
+
+    # If KP01 = 3, the questionnaire tells us to skip KP02.
+    valid_skip = no & cesd["kp02"].isna()
+
+    # If KP01 = 1, KP02 must contain one of the four frequencies.
+    valid_frequency = (
+        yes & cesd["kp02"].isin(["1", "2", "3", "4"])
+    )
+
+    # Record why each response can or cannot be scored.
+    cesd["coding_reason"] = "unverified_or_special_code"
+
+    cesd.loc[
+        no & cesd["kp02"].notna(),
+        "coding_reason",
+    ] = "inconsistent_no_with_frequency"
+
+    cesd.loc[
+        yes & ~valid_frequency,
+        "coding_reason",
+    ] = "yes_frequency_missing_or_special"
+
+    cesd.loc[valid_skip, "coding_reason"] = "valid_no_skip"
+    cesd.loc[valid_frequency, "coding_reason"] = "valid_yes_frequency"
+
+    # --------------------------------------------------------
+    # Calculate frequency scores (0-3).
+    # --------------------------------------------------------
+
+    # KP01 = 3, KP02 blank    -> 0
+    # KP01 = 1, KP02 = 1     -> 0
+    # KP01 = 1, KP02 = 2     -> 1
+    # KP01 = 1, KP02 = 3     -> 2
+    # KP01 = 1, KP02 = 4     -> 3
+    # All other combinations -> missing
+    cesd["frequency_0_3"] = pd.Series(
+        pd.NA,
+        index=cesd.index,
+        dtype="Int64",
+    )
+
+    cesd.loc[valid_skip, "frequency_0_3"] = 0
+
+    cesd.loc[valid_frequency, "frequency_0_3"] = (
+        pd.to_numeric(cesd.loc[valid_frequency, "kp02"]) - 1
     ).astype("Int64")
-    frame["frequency_0_3"] = frequency
 
-    positive = frame["kptype"].isin(POSITIVE_ITEMS)
-    distress = frequency.copy()
-    distress.loc[positive] = 3 - distress.loc[positive]
-    frame["distress_0_3_candidate"] = distress
+    # --------------------------------------------------------
+    # Reverse-score the two positive feelings.
+    # --------------------------------------------------------
 
-    wide = frame.pivot(
-        index="pidlink", columns="kptype", values="distress_0_3_candidate"
-    ).rename(columns={item: f"cesd_{item}" for item in ITEMS})
-    wide = wide[[f"cesd_{item}" for item in ITEMS]]
-    wide["cesd_valid_items"] = wide.notna().sum(axis=1)
+    cesd["distress_0_3_candidate"] = cesd["frequency_0_3"].copy()
+
+    positive = cesd["kptype"].isin(POSITIVE_ITEMS)
+
+    cesd.loc[positive, "distress_0_3_candidate"] = (
+        3 - cesd.loc[positive, "frequency_0_3"]
+    )
+
+    # Higher scores now provisionally represent greater distress.
+
+    # --------------------------------------------------------
+    # Reshape the data to one row per individual.
+    # --------------------------------------------------------
+
+    wide = cesd.pivot(
+        index="pidlink",
+        columns="kptype",
+        values="distress_0_3_candidate",
+    )
+
+    # Rename A, B, C ... to cesd_A, cesd_B, cesd_C ...
+    wide = wide.rename(
+        columns={item: f"cesd_{item}" for item in ITEMS}
+    )
+
+    score_columns = [f"cesd_{item}" for item in ITEMS]
+    wide = wide[score_columns].copy()
+
+    # Count valid scores, not just available questionnaire rows.
+    wide["cesd_valid_items"] = wide[score_columns].notna().sum(axis=1)
     wide["cesd_complete_10"] = wide["cesd_valid_items"].eq(10)
-    wide = wide.reset_index()
-    return frame, wide
 
+    wide = wide.reset_index()
+
+    return cesd, wide
+
+
+# ============================================================
+# 3. LOAD DATA AND CREATE AUDIT REPORTS
+# ============================================================
 
 def main():
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--write-private", action="store_true",
-        help="Save candidate PIDLINK-level item scores locally; refuse to overwrite."
+        "--write-private",
+        action="store_true",
+        help="Save the individual-level CES-D candidate dataset locally.",
     )
     args = parser.parse_args()
 
-    source, _ = stata("ifls4", "b3b_kp")
-    source.columns = source.columns.str.lower()
-    frame, wide = build_cesd(source)
+    # Load the original IFLS4 Stata dataset.
+    data, _ = stata("ifls4", "b3b_kp")
+    data.columns = data.columns.str.lower()
 
-    print("\n=== CES-D: CANDIDATE ITEM CODING ===")
-    patterns = (
-        frame.groupby(["kptype", "coding_reason"], dropna=False)
-        .size().reset_index(name="n_responses")
-        .sort_values(["kptype", "n_responses"], ascending=[True, False])
+    cesd, wide = build_cesd(data)
+
+    # --------------------------------------------------------
+    # 4. Report valid, skipped, and unusual responses.
+    # --------------------------------------------------------
+
+    print("\n=== CES-D RESPONSE PATTERNS ===")
+
+    response_summary = (
+        cesd.groupby(["kptype", "coding_reason"], dropna=False)
+        .size()
+        .reset_index(name="n_responses")
     )
-    print(patterns.to_string(index=False))
-    save_report(patterns, "03b_cesd_coding_reasons.csv")
 
-    scores = (
-        frame.assign(
-            score_code=frame["distress_0_3_candidate"]
-            .astype("string").fillna("<MISSING>")
-        )
-        .groupby(["kptype", "score_code"], dropna=False)
-        .size().reset_index(name="n_responses")
+    print(response_summary.to_string(index=False))
+    save_report(response_summary, "03b_cesd_coding_reasons.csv")
+
+    # --------------------------------------------------------
+    # 5. Report scores and missing values for each item.
+    # --------------------------------------------------------
+
+    print("\n=== CES-D SCORE DISTRIBUTIONS ===")
+
+    cesd["score_code"] = (
+        cesd["distress_0_3_candidate"]
+        .astype("string")
+        .fillna("<MISSING>")
     )
-    save_report(scores, "03b_cesd_candidate_score_frequencies.csv")
 
-    person_counts = (
-        wide["cesd_valid_items"].value_counts(dropna=False)
+    score_summary = (
+        cesd.groupby(["kptype", "score_code"], dropna=False)
+        .size()
+        .reset_index(name="n_responses")
+    )
+
+    print(score_summary.to_string(index=False))
+    save_report(score_summary, "03b_cesd_candidate_score_frequencies.csv")
+
+    # --------------------------------------------------------
+    # 6. Check valid-item completeness per individual.
+    # --------------------------------------------------------
+
+    print("\n=== CES-D COMPLETENESS ===")
+
+    completeness = (
+        wide["cesd_valid_items"]
+        .value_counts(dropna=False)
         .rename_axis("valid_items")
         .reset_index(name="n_people")
         .sort_values("valid_items")
     )
-    print("\n=== VALID DISTRESS INDICATORS PER PERSON ===")
-    print(person_counts.to_string(index=False))
-    save_report(person_counts, "03b_cesd_candidate_person_completeness.csv")
+
+    print(completeness.to_string(index=False))
+    save_report(completeness, "03b_cesd_candidate_person_completeness.csv")
+
+    # --------------------------------------------------------
+    # 7. Optionally save the private person-level candidate file.
+    # --------------------------------------------------------
 
     if args.write_private:
-        save_private(
-            wide, "cesd2007_candidate_items_wide.csv"
-        )
+        save_private(wide, "cesd2007_candidate_items_wide.csv")
     else:
-        print("\nNo person-level data exported. Use --write-private after review.")
+        print("\nNo individual-level data were exported.")
 
-    print(
-        "STOP: provisional scoring, not an approved CES-D latent mediator. "
-        "Check codebook special codes, item distributions and CFA assumptions."
-    )
+    print("\nCES-D candidate construction completed.")
+    print("Review the item distributions and unverified responses.")
+    print("These indicators are not yet validated for CFA or RAPSEM.")
 
 
 if __name__ == "__main__":
