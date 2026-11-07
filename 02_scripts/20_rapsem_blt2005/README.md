@@ -40,6 +40,8 @@ RAPSEM_SETUP_README.md
     measurement_rules_ifls4.md
     tests/test_candidate_measurement.py
     03_build_welfare.py
+    README_welfare_formulas.md
+    tests/test_welfare_formulas.py
     04_build_panel.py
     05_quality_report.py
     study_config.example.json
@@ -206,6 +208,10 @@ For `level="household"`, `key` must be the household ID field in that source. Re
 
 ## 5. Construct harmonized household welfare (substantive check)
 
+For the detailed mathematical definitions, a worked example, missing-value rules,
+input files, and a beginner's explanation of the Python calculations, see
+**[README_welfare_formulas.md](README_welfare_formulas.md)**.
+
 **This step is deliberately not automatic.** Correct poverty measurement is more important than having a fully populated CSV. We need monthly household consumption including verified weekly food, monthly nonfood, yearly nonfood and any additional relevant expenditures, plus own production if appropriate. There must be no double-counting or missing-code-as-zero errors.
 
 Use one of two routes:
@@ -235,6 +241,12 @@ with the columns `wave,hhid,monthly_poverty_line` and real verified BPS threshol
 
 ```bash
 python 02_scripts/20_rapsem_blt2005/03_build_welfare.py
+```
+
+To test the welfare calculations on synthetic examples without touching IFLS data:
+
+```bash
+python -m pytest -q 02_scripts/20_rapsem_blt2005/tests/test_welfare_formulas.py
 ```
 
 It calculates **monthly total expenditure / verified current household size** (per-capita), compares it with the poverty line, and creates the harmonized welfare file. It refuses missing KS components, invalid amounts, and incomplete basket approvals. If the questionnaire proves that a missing amount represents **zero expenditure**, list that exact field under `zero_if_missing_columns` in its approved component; otherwise missing amounts stay missing. It does not download or invent poverty lines.
