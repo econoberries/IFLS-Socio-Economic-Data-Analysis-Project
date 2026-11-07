@@ -43,6 +43,7 @@ RAPSEM_SETUP_README.md
     README_welfare_formulas.md
     tests/test_welfare_formulas.py
     04_build_panel.py
+    tests/test_panel_build.py
     05_quality_report.py
     study_config.example.json
     welfare_basket.example.json
@@ -156,12 +157,10 @@ Do **not** commit these files. Read
 [measurement_rules_ifls4.md](measurement_rules_ifls4.md) for the distinction
 between questionnaire facts and researcher-chosen scoring.
 
-**Important compatibility warning:** These candidate files are *not* yet inputs
-to `04_build_panel.py`. Its earlier implementation reads `KP02` alone and
-does **not** reconstruct skip-dependent item scores; running that panel builder
-with a raw-KP02 mapping would produce incorrect mediator availability. It must
-be updated and validated once the candidate measures and linkage design are
-approved. Do not proceed to `04_build_panel.py` yet.
+**Script 04 compatibility:** The panel builder now reads the candidate files
+from `03a` and `03b`, including the verified KP01/KP02 skip handling.
+It still must **not** be run on actual IFLS panels until treatment exposure
+attribution, the welfare basket, and configuration approvals are completed.
 
 **Stop here until the questionnaire/codebook agrees with our planned variable mapping.** We especially need to verify:
 
@@ -184,7 +183,7 @@ Edit `study_config.json` using your actual labels and questionnaire evidence. Fi
 
 1. Roster: current-member codes and correct `PIDLINK`, `HHID`, `AR01A`, age fields for **each wave**. Set each `approved` flag only after verification.
 2. Treatment: the **correct IFLS4 BLT I source**, program selector if necessary, explicitly reported yes/no categories and date meaning. Only set `exposure_assignment_verified=true` after evaluating household splitting and whether the historical recipient household corresponds to the 2007 household.
-3. Mediator: the ten `KPTYPE` codes and valid `KP02` categories. The default builder expects *long-form* KP with one row per person-item; verify this against data.
+3. Mediator: verify the ten `KPTYPE` codes and the KP01/KP02 skip logic. The panel builder now reads the scored wide file produced by `03b` rather than raw KP; the legacy `response_column` and `item_code_map` fields in the example configuration are not used by Script 04.
 4. Baseline covariates: add approved mappings such as `age` (already from roster), education, employment, sex, baseline housing and assets. Do not automatically treat 2007/2014 values as baseline confounders.
 5. Welfare: link the approved `household_welfare_harmonized.csv` generated in Step 5 (or by a trusted independently validated construction).
 
@@ -255,6 +254,41 @@ It calculates **monthly total expenditure / verified current household size** (p
 
 ## 6. Construct the person-level panel
 
+The simplified `04_build_panel.py` **reuses** the private BLT file from
+`03a` and the **KP01/KP02-adjusted** ten-item CES-D file from `03b`.
+It no longer attempts to reconstruct CES-D from `KP02` alone.
+This is important for correct skip logic and reproducibility.
+
+**Before running Script 04**, generate the private candidate inputs by adding
+`--write-private` to the 03a and 03b commands **only after reviewing their
+aggregate reports**:
+
+```bash
+python 02_scripts/20_rapsem_blt2005/03a_build_blt_treatment.py --write-private
+python 02_scripts/20_rapsem_blt2005/03b_build_cesd_indicators.py --write-private
+```
+
+Both private input files stay under Git-ignored `01_data/04_intermediate/`.
+Script 04 requires the verified IFLS3/IFLS5 welfare file and the
+`study_config.json` approval flags, including
+`treatment.exposure_assignment_verified=true` **only after investigating
+how 2005/06 recipients relate to 2007 households and split-offs**.
+Approval flags are not substitutes for actual design verification.
+
+The panel uses `PIDLINK` for individual links and each wave's `HHID` for
+household welfare and BLT. Treatment and follow-up welfare are assigned
+according to **household membership in different years**. They are not
+automatically proof of historical household exposure or one stable household.
+The output column `blt_2005` is a *candidate* derived from the 03a
+classification; its name is kept for compatibility with the quality report.
+
+Run a test using small invented data, without accessing IFLS:
+
+```bash
+python -m pytest -q 02_scripts/20_rapsem_blt2005/tests/test_panel_build.py
+```
+
+
 After `study_config.json` approvals and the harmonized welfare file are ready:
 
 ```bash
@@ -265,8 +299,8 @@ python 02_scripts/20_rapsem_blt2005/05_quality_report.py
 The builder will produce **private, person-level datasets** inside the existing Git-ignored `01_data/` folder:
 
 - `01_data/04_intermediate/rapsem_blt2005/baseline_person_2000.csv`: baseline adult covariates and person/household IDs.
-- `01_data/04_intermediate/rapsem_blt2005/blt2005_household_ifls4.csv`: verified historical BLT status linked to IFLS4 households.
-- `01_data/04_intermediate/rapsem_blt2005/cesd_items_2007.csv`: ten raw CES-D indicators linked by PIDLINK.
+- `01_data/04_intermediate/rapsem_blt2005/blt2005_household_ifls4.csv`: candidate BLT treatment status from 03a, linked by IFLS4 household ID.
+- `01_data/04_intermediate/rapsem_blt2005/cesd_items_2007.csv`: ten provisionally scored CES-D indicators from 03b, linked by PIDLINK.
 - `01_data/04_intermediate/rapsem_blt2005/person_panel_full.csv`: baseline adults and flags for later waves, BLT, CES-D and welfare.
 - `01_data/05_analysis/rapsem_blt2005/baseline_poor_analysis_panel.csv`: people from baseline-poor households, including still-missing follow-up values for transparent attrition audits.
 
@@ -320,9 +354,14 @@ python -m pytest 02_scripts/20_rapsem_blt2005/tests/test_candidate_measurement.p
 # Only after welfare basket + poverty thresholds are verified (Route B):
 python 02_scripts/20_rapsem_blt2005/03_build_welfare.py
 
-# NOT YET: 04_build_panel.py needs KP01/KP02 skip handling and review of
-#          household-to-person treatment assignment before any final panel.
-# After its revised implementation is approved:
+# Create private candidate inputs from 03a and 03b ONLY AFTER reviewing their reports:
+# python 02_scripts/20_rapsem_blt2005/03a_build_blt_treatment.py --write-private
+# python 02_scripts/20_rapsem_blt2005/03b_build_cesd_indicators.py --write-private
+# Synthetic safety check (no IFLS data required):
+python -m pytest -q 02_scripts/20_rapsem_blt2005/tests/test_panel_build.py
+
+# LATER: only after verifying historical exposure, rosters, welfare, and
+#        approving study_config.json, build the private person panel:
 python 02_scripts/20_rapsem_blt2005/04_build_panel.py
 python 02_scripts/20_rapsem_blt2005/05_quality_report.py
 ```
