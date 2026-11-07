@@ -10,7 +10,7 @@ creating CSV copies, and building education and socioeconomic analyses.
 Your current local project folder is:
 
 ```text
-/Users/khaira_abdillah/Documents/IFLS_Causal_Project/IFLS-Socio-Economic-Data-Analysis-Project-main/
+/Users/khaira_abdillah/Documents/IFLS_Causal_Project/IFLS-Socio-Economic-Data-Analysis-Project/
 ```
 
 1. Open **IFLS_Project.Rproj** inside this folder in RStudio.
