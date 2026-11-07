@@ -45,6 +45,7 @@ RAPSEM_SETUP_README.md
     04_build_panel.py
     tests/test_panel_build.py
     05_quality_report.py
+    tests/test_quality_report.py
     study_config.example.json
     welfare_basket.example.json
     requirements.txt
@@ -289,7 +290,19 @@ python -m pytest -q 02_scripts/20_rapsem_blt2005/tests/test_panel_build.py
 ```
 
 
-After `study_config.json` approvals and the harmonized welfare file are ready:
+After `study_config.json` approvals and the harmonized welfare file are ready.
+Script 05 reads the private output of Script 04 and creates aggregate
+missingness and selection reports. For the **missing-percentage formula,
+column definitions, worked examples, and interpretation warnings**, see
+[README_welfare_formulas.md — Section 10](README_welfare_formulas.md#10-quality-checks-after-constructing-the-person-panel-script-05).
+
+You can test the quality-report calculations without private IFLS data:
+
+```bash
+python -m pytest -q 02_scripts/20_rapsem_blt2005/tests/test_quality_report.py
+```
+
+Then, **only after the data and treatment attribution are validated**:
 
 ```bash
 python 02_scripts/20_rapsem_blt2005/04_build_panel.py
@@ -359,6 +372,9 @@ python 02_scripts/20_rapsem_blt2005/03_build_welfare.py
 # python 02_scripts/20_rapsem_blt2005/03b_build_cesd_indicators.py --write-private
 # Synthetic safety check (no IFLS data required):
 python -m pytest -q 02_scripts/20_rapsem_blt2005/tests/test_panel_build.py
+
+# Synthetic tests for the descriptive quality report:
+python -m pytest -q 02_scripts/20_rapsem_blt2005/tests/test_quality_report.py
 
 # LATER: only after verifying historical exposure, rosters, welfare, and
 #        approving study_config.json, build the private person panel:
