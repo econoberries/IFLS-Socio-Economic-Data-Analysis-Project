@@ -1,93 +1,375 @@
-"""Build harmonized PCE only after item mapping, reference periods and basket completeness are approved.
-
-No default consumption values or poverty lines are generated. This program stops
-rather than treat partially mapped baskets as complete household welfare.
 """
+03_build_welfare.py
+
+Calculate household welfare for IFLS3 (2000) and IFLS5 (2014/15).
+
+Outputs:
+- Monthly household expenditure
+- Monthly per capita expenditure (PCE)
+- Log PCE divided by the poverty line
+- Poverty status (1 = poor, 0 = not poor)
+
+Before running:
+1. Verify the expenditure items and reference periods for both waves.
+2. Complete and approve welfare_basket.json.
+3. Complete and approve the household roster settings in study_config.json.
+4. Supply real, correctly matched household poverty lines.
+
+Original Stata files are never changed. Existing private outputs are not
+overwritten. See README_welfare_formulas.md for the formulas and assumptions.
+"""
+
 import json
+
 import numpy as np
 import pandas as pd
-from common import (script_dir,project_root,approved,read_config,stata,
-                    normalized,require_columns,assert_unique,intermediate_dir,save_report)
 
-p=script_dir()/'welfare_basket.json'
-if not p.exists():raise SystemExit('Copy welfare_basket.example.json to welfare_basket.json, audit KS codebooks and complete all component mappings.')
-cfg=json.loads(p.read_text(encoding='utf-8'))
-approved(cfg)
-rosters=read_config()['rosters']
-all_out=[]; audit=[]
-for wave in ('ifls3','ifls5'):
-    if not cfg.get(f'basket_complete_{wave}',False):
-        raise ValueError(f'{wave} basket_complete flag is false. Verify ALL consumption components, including relevant KS0, before building PCE.')
-    r=rosters[wave];approved(r)
-    if not r['current_codes']:raise ValueError('Current household member codes required')
-    roster,_=stata(wave,r['file'])
-    require_columns(roster,[r['pid'],r['household'],r['membership']],f'{wave} roster')
-    mask=normalized(roster[r['membership']]).isin([str(x) for x in r['current_codes']])
-    roster=roster.loc[mask,[r['pid'],r['household']]].copy()
-    roster['person_id']=normalized(roster[r['pid']]);roster['hhid']=normalized(roster[r['household']])
-    roster=roster.dropna(subset=['person_id','hhid'])
-    assert_unique(roster,'person_id',f'{wave} current roster')
-    sizes=roster.groupby('hhid').size().rename('household_size').reset_index()
-    pieces=[]
-    for j,sp in enumerate(cfg['components'][wave]):
-        if not sp['amount_columns'] or (not sp.get('all_rows_approved') and not sp.get('include_codes')):
-            raise ValueError(f'{wave} {sp["file"]}: amount_columns or approved item filters missing.')
-        factor=float(sp['multiply_to_monthly'])
-        if factor<=0 or not np.isfinite(factor):raise ValueError('Invalid period conversion factor')
-        d,_=stata(wave,sp['file'])
-        needed=[sp['household']]+list(sp['amount_columns'])
-        if sp.get('item_column'):needed.append(sp['item_column'])
-        require_columns(d,needed,f'{wave} {sp["file"]}')
-        d=d.copy()
-        d['hhid']=normalized(d[sp['household']])
-        d=d.loc[d['hhid'].notna()]
-        if not sp.get('all_rows_approved'):
-            d=d.loc[normalized(d[sp['item_column']]).isin([str(k) for k in sp['include_codes']])]
-        if d.empty:raise ValueError(f'{wave} {sp["file"]}: no rows after approved filters; check codes.')
-        vals=[]
-        for a in sp['amount_columns']:
-            s=normalized(d[a]);s=s.mask(s.isin([str(v) for v in cfg.get('missing_codes',[])]))
-            v=pd.to_numeric(s,errors='coerce')
-            if a in sp.get('zero_if_missing_columns',[]):
-                v=v.fillna(0)
-            vals.append(v)
-        stack=pd.concat(vals,axis=1)
-        stack.columns=sp['amount_columns']
-        item=stack.sum(axis=1,min_count=len(vals))*factor
-        if (item.dropna()<0).any():raise ValueError(f'{wave} {sp["file"]}: negative expenditure found; review values and special codes.')
-        d['amount']=item
-        agg=d.groupby('hhid',dropna=False).agg(total=('amount',lambda s:s.sum(min_count=1)),n_rows=('amount','size'),n_missing=('amount',lambda s:int(s.isna().sum()))).reset_index()
-        label=f'part{j+1}_{sp["file"]}'
-        agg=agg.rename(columns={'total':label,'n_rows':label+'_rows','n_missing':label+'_missing'})
-        pieces.append(agg)
-        audit.append(dict(wave=wave,file=sp['file'],selected_rows=len(d),total_missing_item_values=int(d['amount'].isna().sum()),households=agg.shape[0]))
-    w=sizes
-    for a in pieces:w=w.merge(a,on='hhid',how='left',validate='one_to_one')
-    total_cols=[c for c in w.columns if c.startswith('part') and '_rows' not in c and '_missing' not in c]
-    has_full=w[total_cols].notna().all(axis=1)
-    has_no_missing=w[[c for c in w if c.endswith('_missing')]].fillna(1).eq(0).all(axis=1)
-    w['monthly_total_expenditure']=w[total_cols].sum(axis=1,min_count=len(total_cols)).where(has_full & has_no_missing)
-    w['monthly_pce']=w['monthly_total_expenditure']/w['household_size']
-    w['wave']=wave
-    all_out.append(w)
-all_welfare=pd.concat(all_out,ignore_index=True)
-poverty_path=project_root()/cfg['poverty_lines_file']
-if not poverty_path.exists():
-    raise FileNotFoundError(f'Missing verified poverty lines {poverty_path}. Required: wave, hhid, monthly_poverty_line.')
-pl=pd.read_csv(poverty_path,dtype='string')
-require_columns(pl,['wave','hhid','monthly_poverty_line'],'poverty line source')
-pl['hhid']=normalized(pl['hhid'])
-assert_unique(pl[['wave','hhid']].assign(wave_hh=pl['wave']+'|'+pl['hhid']),'wave_hh','poverty lines')
-pl['monthly_poverty_line']=pd.to_numeric(pl['monthly_poverty_line'],errors='coerce')
-if not pl['monthly_poverty_line'].dropna().gt(0).all():raise ValueError('Poverty lines must be positive.')
-merged=all_welfare.merge(pl[['wave','hhid','monthly_poverty_line']],on=['wave','hhid'],how='left',validate='one_to_one')
-merged['log_pce_pl']=np.log(merged['monthly_pce']/merged['monthly_poverty_line'])
-merged['poor']=(merged['log_pce_pl']<0).astype('Int64').where(merged['log_pce_pl'].notna())
-summary=merged.groupby('wave').agg(households=('hhid','size'),with_valid_welfare=('log_pce_pl','count'),median_pce=('monthly_pce','median')).reset_index()
-save_report(pd.DataFrame(audit),'03_welfare_component_audit.csv')
-save_report(summary,'03_welfare_summary.csv')
-out=intermediate_dir()/'household_welfare_harmonized.csv'
-if out.exists():raise FileExistsError(f'{out} already exists. Back up and remove it yourself before rebuilding.')
-merged[['wave','hhid','monthly_pce','monthly_poverty_line','log_pce_pl','poor','household_size']].to_csv(out,index=False)
-print('CREATED private harmonized welfare:',out)
-print('STOP: verify welfare distributions, item aggregation, official poverty thresholds, year and price compatibility.')
+from common import (
+    script_dir,
+    project_root,
+    read_config,
+    approved,
+    stata,
+    normalized,
+    require_columns,
+    assert_unique,
+    intermediate_dir,
+    save_report,
+)
+
+
+# ============================================================
+# 1. HOUSEHOLD SIZE
+# ============================================================
+
+def get_household_size(wave, settings):
+    """Count approved current household members from the Book K roster."""
+
+    approved(settings)
+
+    if not settings["current_codes"]:
+        raise ValueError(f"{wave}: Current household member codes are missing.")
+
+    roster, _ = stata(wave, settings["file"])
+
+    required_columns = [
+        settings["pid"],
+        settings["household"],
+        settings["membership"],
+    ]
+    require_columns(roster, required_columns, f"{wave} roster")
+
+    # Keep only the household members approved for expenditure denominators.
+    current_codes = [str(code) for code in settings["current_codes"]]
+    member_codes = normalized(roster[settings["membership"]])
+    roster = roster.loc[member_codes.isin(current_codes)].copy()
+
+    roster["pidlink"] = normalized(roster[settings["pid"]])
+    roster["hhid"] = normalized(roster[settings["household"]])
+    roster = roster.dropna(subset=["pidlink", "hhid"])
+
+    # Duplicate individuals would produce incorrect household sizes.
+    assert_unique(roster, "pidlink", f"{wave} current roster")
+
+    household_size = (
+        roster.groupby("hhid")
+        .size()
+        .reset_index(name="household_size")
+    )
+    return household_size
+
+
+# ============================================================
+# 2. ONE CONSUMPTION COMPONENT
+# ============================================================
+
+def get_expenditure(wave, settings, number, missing_codes):
+    """Convert one approved consumption component to monthly expenditure."""
+
+    file_name = settings["file"]
+    amount_columns = settings["amount_columns"]
+
+    if not amount_columns:
+        raise ValueError(f"{wave} {file_name}: No expenditure columns specified.")
+
+    use_all_rows = settings.get("all_rows_approved", False)
+
+    if not use_all_rows and not settings.get("include_codes"):
+        raise ValueError(f"{wave} {file_name}: Consumption item codes not approved.")
+
+    monthly_factor = float(settings["multiply_to_monthly"])
+
+    if not np.isfinite(monthly_factor) or monthly_factor <= 0:
+        raise ValueError(f"{wave} {file_name}: Invalid monthly conversion factor.")
+
+    data, _ = stata(wave, file_name)
+
+    required_columns = [settings["household"]] + amount_columns
+    if not use_all_rows:
+        required_columns.append(settings["item_column"])
+
+    require_columns(data, required_columns, f"{wave} {file_name}")
+
+    data = data.copy()
+    data["hhid"] = normalized(data[settings["household"]])
+    data = data.dropna(subset=["hhid"])
+
+    # Select only items listed in the verified basket configuration.
+    if not use_all_rows:
+        item_codes = [str(code) for code in settings["include_codes"]]
+        selected = normalized(data[settings["item_column"]]).isin(item_codes)
+        data = data.loc[selected].copy()
+
+    if data.empty:
+        raise ValueError(f"{wave} {file_name}: No approved expenditure records.")
+
+    # Replace verified special missing codes with NA before converting to numbers.
+    missing_codes = [str(code) for code in missing_codes]
+
+    for column in amount_columns:
+        values = normalized(data[column])
+        values = values.mask(values.isin(missing_codes))
+        data[column] = pd.to_numeric(values, errors="coerce")
+
+        # Only a documented, explicitly approved missing-as-zero rule is allowed.
+        if column in settings.get("zero_if_missing_columns", []):
+            data[column] = data[column].fillna(0)
+
+    # If one required column is missing, the item's total remains missing.
+    data["monthly_amount"] = (
+        data[amount_columns].sum(axis=1, min_count=len(amount_columns))
+        * monthly_factor
+    )
+
+    if (data["monthly_amount"].dropna() < 0).any():
+        raise ValueError(f"{wave} {file_name}: Negative expenditure detected.")
+
+    # Add recorded consumption items within each household.
+    expenditure = (
+        data.groupby("hhid")
+        .agg(
+            total=("monthly_amount", lambda values: values.sum(min_count=1)),
+            missing=("monthly_amount", lambda values: values.isna().sum()),
+        )
+        .reset_index()
+    )
+
+    component_name = f"part{number}_{file_name}"
+    expenditure = expenditure.rename(
+        columns={
+            "total": component_name,
+            "missing": f"{component_name}_missing",
+        }
+    )
+
+    audit = {
+        "wave": wave,
+        "file": file_name,
+        "selected_rows": len(data),
+        "total_missing_item_values": int(data["monthly_amount"].isna().sum()),
+        "households": len(expenditure),
+    }
+
+    return expenditure, component_name, audit
+
+
+# ============================================================
+# 3. POVERTY VARIABLES
+# ============================================================
+
+def calculate_poverty(welfare):
+    """Add log relative welfare and a nullable poverty indicator."""
+
+    ratio = welfare["monthly_pce"] / welfare["monthly_poverty_line"]
+
+    # log(0) and log(negative values) are not valid finite welfare values.
+    welfare["log_pce_pl"] = np.log(ratio.where(ratio > 0))
+
+    welfare["poor"] = (
+        (welfare["log_pce_pl"] < 0)
+        .astype("Int64")
+        .where(welfare["log_pce_pl"].notna())
+    )
+
+    return welfare
+
+
+# ============================================================
+# 4. MAIN WORKFLOW
+# ============================================================
+
+def main():
+
+    # Step 1. Load the verified configuration.
+    config_path = script_dir() / "welfare_basket.json"
+
+    if not config_path.exists():
+        raise FileNotFoundError(
+            "Missing welfare_basket.json. Copy the example file and "
+            "verify every item, reference period, and approval flag."
+        )
+
+    with open(config_path, "r", encoding="utf-8") as file:
+        config = json.load(file)
+
+    approved(config)
+    roster_config = read_config()["rosters"]
+
+    all_waves = []
+    audit_results = []
+
+    # Step 2. Build monthly household expenditure for each wave.
+    for wave in ["ifls3", "ifls5"]:
+
+        print(f"\nProcessing {wave.upper()}...")
+
+        if not config.get(f"basket_complete_{wave}", False):
+            raise ValueError(
+                f"{wave}: Complete expenditure basket has not been approved. "
+                "Check KS0 and other relevant consumption components."
+            )
+
+        components = config["components"][wave]
+
+        if not components:
+            raise ValueError(f"{wave}: No expenditure components configured.")
+
+        household = get_household_size(wave, roster_config[wave])
+        amount_columns = []
+        missing_columns = []
+
+        for number, settings in enumerate(components, start=1):
+            expenditure, name, audit = get_expenditure(
+                wave,
+                settings,
+                number,
+                config.get("missing_codes", []),
+            )
+
+            household = household.merge(
+                expenditure,
+                on="hhid",
+                how="left",
+                validate="one_to_one",
+            )
+
+            amount_columns.append(name)
+            missing_columns.append(f"{name}_missing")
+            audit_results.append(audit)
+
+        # A household is complete only if each configured component is
+        # available and none of its recorded item amounts is missing.
+        has_all_components = household[amount_columns].notna().all(axis=1)
+        has_no_missing_items = (
+            household[missing_columns].fillna(1).eq(0).all(axis=1)
+        )
+        complete = has_all_components & has_no_missing_items
+
+        household["monthly_total_expenditure"] = (
+            household[amount_columns]
+            .sum(axis=1, min_count=len(amount_columns))
+            .where(complete)
+        )
+
+        household["monthly_pce"] = (
+            household["monthly_total_expenditure"]
+            / household["household_size"]
+        )
+
+        household["wave"] = wave
+        all_waves.append(household)
+
+        print(f"Households: {len(household):,}")
+        print(f"With complete configured expenditure: {int(complete.sum()):,}")
+
+    # Step 3. Combine the two survey waves.
+    welfare = pd.concat(all_waves, ignore_index=True)
+
+    # Step 4. Load official, verified poverty lines supplied by the researcher.
+    poverty_path = project_root() / config["poverty_lines_file"]
+
+    if not poverty_path.exists():
+        raise FileNotFoundError(f"Missing verified poverty line file: {poverty_path}")
+
+    poverty_lines = pd.read_csv(poverty_path, dtype="string")
+    require_columns(
+        poverty_lines,
+        ["wave", "hhid", "monthly_poverty_line"],
+        "Poverty line dataset",
+    )
+
+    poverty_lines["wave"] = normalized(poverty_lines["wave"])
+    poverty_lines["hhid"] = normalized(poverty_lines["hhid"])
+
+    if poverty_lines[["wave", "hhid"]].isna().any().any():
+        raise ValueError("Poverty line household IDs or waves are missing.")
+
+    if poverty_lines.duplicated(["wave", "hhid"]).any():
+        raise ValueError("Duplicate household poverty line entries found.")
+
+    poverty_lines["monthly_poverty_line"] = pd.to_numeric(
+        poverty_lines["monthly_poverty_line"],
+        errors="coerce",
+    )
+
+    if (poverty_lines["monthly_poverty_line"].dropna() <= 0).any():
+        raise ValueError("Poverty lines must be positive.")
+
+    welfare = welfare.merge(
+        poverty_lines[["wave", "hhid", "monthly_poverty_line"]],
+        on=["wave", "hhid"],
+        how="left",
+        validate="one_to_one",
+    )
+
+    # Step 5. Calculate relative welfare and poverty status.
+    welfare = calculate_poverty(welfare)
+
+    # Step 6. Save aggregate audit reports.
+    summary = (
+        welfare.groupby("wave")
+        .agg(
+            households=("hhid", "size"),
+            with_valid_welfare=("log_pce_pl", "count"),
+            median_pce=("monthly_pce", "median"),
+        )
+        .reset_index()
+    )
+
+    save_report(
+        pd.DataFrame(audit_results),
+        "03_welfare_component_audit.csv",
+    )
+    save_report(summary, "03_welfare_summary.csv")
+
+    print("\n=== WELFARE SUMMARY ===")
+    print(summary.to_string(index=False))
+
+    # Step 7. Save the private welfare file (never overwrite existing data).
+    output_path = intermediate_dir() / "household_welfare_harmonized.csv"
+
+    if output_path.exists():
+        raise FileExistsError(
+            f"Output already exists: {output_path}. "
+            "Back it up before rebuilding."
+        )
+
+    output_columns = [
+        "wave",
+        "hhid",
+        "monthly_pce",
+        "monthly_poverty_line",
+        "log_pce_pl",
+        "poor",
+        "household_size",
+    ]
+
+    welfare[output_columns].to_csv(output_path, index=False)
+
+    print("\nPrivate welfare dataset created:", output_path)
+    print("STOP: Review basket coverage, interview periods, poverty lines, and")
+    print("welfare distributions before using this file in the research panel.")
+
+
+if __name__ == "__main__":
+    main()
