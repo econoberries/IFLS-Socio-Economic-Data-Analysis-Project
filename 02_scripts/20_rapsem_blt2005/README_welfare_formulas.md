@@ -22,7 +22,7 @@ We first construct **one welfare row per household per survey wave**:
 |---|---|
 | `wave` | `ifls3` (2000) or `ifls5` (2014–15) |
 | `hhid` | Household identifier within that wave |
-| `household_size` | Number of approved household members (\(N_{hw}\)) |
+| `household_size` | Number of approved household members ($N_{hw}$) |
 | `monthly_pce` | Monthly expenditure per household member |
 | `monthly_poverty_line` | Verified poverty threshold, in the same money/time units |
 | `log_pce_pl` | Natural log of PCE / poverty line |
@@ -33,11 +33,11 @@ household ID or household composition across IFLS3, IFLS4, and IFLS5.
 
 Notation:
 
-- \(h\) = household in a particular survey wave
-- \(w\) = IFLS wave
-- \(k\) = consumption component (e.g., weekly food, monthly nonfood)
-- \(i\) = selected item/row within a component
-- \(N_{hw}\) = eligible current household size
+- $h$ = household in a particular survey wave
+- $w$ = IFLS wave
+- $k$ = consumption component (e.g., weekly food, monthly nonfood)
+- $i$ = selected item/row within a component
+- $N_{hw}$ = eligible current household size
 
 ## 2. Step A — Convert expenditure to a monthly basis
 
@@ -45,23 +45,23 @@ Different questions can use **different recall periods**. For each
 approved expenditure item, multiply the recorded amount by the factor
 that converts its stated period to a month:
 
-\[
+$$
 e^{(month)}_{ihwk} = f_{wk}\,\sum_{c\in C_{wk}} x_{ihwkc}
-\]
+$$
 
 where:
 
-- \(x_{ihwkc}\) is the observed expenditure amount from an approved field,
-- \(C_{wk}\) is the set of amount fields required for that component,
-- \(f_{wk}\) is the *approved* multiplier to monthly units.
+- $x_{ihwkc}$ is the observed expenditure amount from an approved field,
+- $C_{wk}$ is the set of amount fields required for that component,
+- $f_{wk}$ is the *approved* multiplier to monthly units.
 
 Illustrative period conversions (not automatically validated basket rules):
 
 | Recall period | Example multiplier | Reason |
 |---|---:|---|
-| Previous week | \(52/12 \approx 4.3333\) | 52 weeks / 12 months |
-| Previous month | \(1\) | Already monthly |
-| Previous 12 months | \(1/12 \approx 0.0833\) | Annual amount divided by 12 |
+| Previous week | $52/12 \approx 4.3333$ | 52 weeks / 12 months |
+| Previous month | $1$ | Already monthly |
+| Previous 12 months | $1/12 \approx 0.0833$ | Annual amount divided by 12 |
 
 **Important:** The actual fields and recall period must be verified against
 the **IFLS3 and IFLS5** questionnaires and codebooks, independently.
@@ -91,17 +91,17 @@ Blank/NA, refused, don't know, and not-applicable are not all the same thing.
 
 First add all **recorded approved items** within each component:
 
-\[
+$$
 E_{hwk} = \sum_{i\in I_{hwk}} e^{(month)}_{ihwk}
-\]
+$$
 
 Then add the components:
 
-\[
+$$
 C_{hw} = \sum_{k=1}^{K_w} E_{hwk}
-\]
+$$
 
-where \(C_{hw}\) is total monthly household expenditure.
+where $C_{hw}$ is total monthly household expenditure.
 
 The script uses a **strict completeness rule for the configured fields**:
 
@@ -120,10 +120,10 @@ before setting the basket approval flags.
 From the wave's Book K roster, retain only **verified member-status codes**,
 then count unique linked people per household:
 
-\[
+$$
 N_{hw} = \#\{\text{eligible current household members of }h
 \text{ in wave }w\}
-\]
+$$
 
 The roster function rejects duplicate `PIDLINK` records after filtering.
 No arbitrary `drop_duplicates()` is used.
@@ -137,9 +137,9 @@ IFLS4 codes blindly to IFLS3 and IFLS5.
 
 ## 5. Step D — Monthly per capita expenditure (PCE)
 
-\[
+$$
 \boxed{\mathrm{PCE}_{hw}=\frac{C_{hw}}{N_{hw}}}
-\]
+$$
 
 PCE describes average monthly household expenditure **per eligible member**.
 It is not the same as wages, income, wealth, or cash-transfer receipt.
@@ -149,36 +149,36 @@ A household without a valid denominator should never receive PCE.
 
 ## 6. Step E — Compare PCE with a verified poverty line
 
-Let \(PL_{hw}\) be the correct **monthly poverty threshold per person**,
+Let $PL_{hw}$ be the correct **monthly poverty threshold per person**,
 matched to the household's relevant survey date and geography.
 
 The relative welfare measure is:
 
-\[
+$$
 R_{hw} = \frac{\mathrm{PCE}_{hw}}{PL_{hw}}
-\]
+$$
 
 Its natural log is:
 
-\[
+$$
 \boxed{W_{hw}=\log\left(\frac{\mathrm{PCE}_{hw}}{PL_{hw}}\right)}
-\]
+$$
 
 For valid positive PCE and poverty-line values:
 
-\[
+$$
 \mathrm{Poor}_{hw} =
 \begin{cases}
 1 & \mathrm{PCE}_{hw}<PL_{hw} \quad (W_{hw}<0),\\
 0 & \mathrm{PCE}_{hw}\geq PL_{hw} \quad (W_{hw}\geq0).
 \end{cases}
-\]
+$$
 
 Interpretation:
 
-- \(W<0\): PCE is below the poverty line.
-- \(W=0\): PCE equals the poverty line.
-- \(W>0\): PCE exceeds the poverty line.
+- $W<0$: PCE is below the poverty line.
+- $W=0$: PCE equals the poverty line.
+- $W>0$: PCE exceeds the poverty line.
 
 **Zero PCE needs special attention.** Its log is not finite. For now, the
 script deliberately sets both `log_pce_pl` and `poor` to missing for a
@@ -209,14 +209,14 @@ Suppose a household reports:
 | Nonfood (past year) | Rp 1,200,000 | Rp 100,000 (= 1,200,000 / 12) |
 | **Total** | | **Rp 1,600,000** |
 
-If \(N=4\), then monthly PCE is Rp 400,000. If a **hypothetical** monthly
+If $N=4$, then monthly PCE is Rp 400,000. If a **hypothetical** monthly
 poverty line is Rp 500,000 per person, then:
 
-\[
+$$
 R=400{,}000/500{,}000=0.8,\qquad
 W=\log(0.8)\approx -0.2231,\qquad
 \mathrm{Poor}=1.
-\]
+$$
 
 These numbers are **an illustration, not IFLS measurements or an official
 Indonesian poverty line**.
