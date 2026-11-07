@@ -6,26 +6,20 @@
 
 ## 0. Locate the project root; do not make a second IFLS project
 
-Use the existing directory containing `IFLS_Project.Rproj`. Depending on your local checkout it can be either
+Your current local repository root (from the Terminal audit output) is:
 
 ```text
-/Users/khaira_abdillah/Documents/IFLS_Causal_Project/
+/Users/khaira_abdillah/Documents/IFLS_Causal_Project/IFLS-Socio-Economic-Data-Analysis-Project/
 ```
 
-or
-
-```text
-/Users/khaira_abdillah/Documents/IFLS_Causal_Project/IFLS-Socio-Economic-Data-Analysis-Project-main/
-```
-
-The important test is that `IFLS_Project.Rproj`, `01_data/`, and `02_scripts/` are all in the same directory. The new scripts find this root automatically. From Terminal, do:
+The important test is that `IFLS_Project.Rproj`, `01_data/`, and
+`02_scripts/` are in the same directory. If you clone elsewhere, use
+the folder containing those files. From Terminal:
 
 ```bash
-cd "/Users/khaira_abdillah/Documents/IFLS_Causal_Project"
+cd "/Users/khaira_abdillah/Documents/IFLS_Causal_Project/IFLS-Socio-Economic-Data-Analysis-Project"
 ls IFLS_Project.Rproj
 ```
-
-If the second command says the file does not exist, `cd` into the nested repository directory instead and run it again.
 
 ### Installed as part of the GitHub repository
 
